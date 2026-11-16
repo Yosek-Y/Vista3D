@@ -1,0 +1,1665 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Monitor Hídrico 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: escena 3D a pantalla completa; barra superior de mando, panel lateral tipo "app" (abajo en móvil), asistente flotante a la derecha.
+   Estética de cuarto de control (SCADA) sobre un paisaje de granja de día: un solo tema oscuro para los paneles, elegido a propósito. */
+:root{
+  --bg:#0d171d;
+  --panel:rgba(13,24,31,.92);
+  --panel-solid:#0f1d24;
+  --raise:rgba(180,215,232,.06);
+  --line:rgba(173,205,222,.15);
+  --ink:#e3edf2;
+  --muted:#8fa7b4;
+  --water:#4ab6e6;
+  --water-deep:#1d7fb3;
+  --ok:#4fc58e;
+  --warn:#efb23d;
+  --crit:#f0604f;
+  --info:#7ab6da;
+  --f-display:'Barlow Semi Condensed','Arial Narrow',system-ui,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Consolas,monospace;
+  --topbar-h:64px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* ---------- barra superior ---------- */
+#topbar{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;
+  padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:var(--panel);border-bottom:1px solid var(--line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand-mark{width:30px;height:30px;flex:none}
+.brand h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:21px;letter-spacing:.01em;line-height:1}
+.brand small{display:block;color:var(--muted);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.tb-group{display:flex;align-items:center;gap:8px}
+.clock{font-family:var(--f-mono);font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--raise);white-space:nowrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{background:none;border:0;padding:6px 9px;cursor:pointer;font-family:var(--f-mono);font-size:12.5px;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--water-deep);color:#fff}
+.tb-spacer{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--raise);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap;transition:background .15s,border-color .15s}
+.btn:hover{background:rgba(180,215,232,.12)}
+.btn:focus-visible,.seg button:focus-visible,.tab:focus-visible,.switch input:focus-visible+span{outline:2px solid var(--water);outline-offset:2px}
+.btn.primary{background:var(--water-deep);border-color:transparent;color:#fff}
+.btn.primary:hover{background:#2590c9}
+.btn.danger{border-color:rgba(240,96,79,.5);color:#ffb3a9}
+.btn.danger:hover{background:rgba(240,96,79,.16)}
+.btn.small{padding:5px 9px;font-size:12.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn svg{width:15px;height:15px}
+#panelToggle{display:none}
+
+/* interruptor */
+.switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:13px}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.switch span.track{width:36px;height:20px;border-radius:20px;background:#3a4b55;position:relative;transition:background .15s;flex:none}
+.switch span.track::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#dfe9ee;transition:transform .15s}
+.switch input:checked+span.track{background:var(--ok)}
+.switch input:checked+span.track::after{transform:translateX(16px)}
+.switch.bad input:checked+span.track{background:var(--crit)}
+
+/* ---------- panel lateral (app) ---------- */
+#panel{position:fixed;z-index:15;top:calc(var(--topbar-h) + 12px);left:max(12px,env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  width:384px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tab{flex:1;background:none;border:0;padding:11px 4px 10px;cursor:pointer;color:var(--muted);font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.02em;border-bottom:2px solid transparent;position:relative}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--water)}
+.tab .badge{position:absolute;top:6px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--crit);color:#fff;font-family:var(--f-mono);font-size:10px;line-height:16px}
+.views{flex:1;overflow-y:auto;overscroll-behavior:contain}
+.view{padding:14px 14px 20px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:12px}
+.card h3,.sec-title{margin:0;font-family:var(--f-display);font-weight:600;font-size:16px;letter-spacing:.02em}
+.sec-title{color:var(--muted);text-transform:uppercase;font-size:12.5px;letter-spacing:.09em;margin-top:4px}
+.muted{color:var(--muted)}
+.hint{color:var(--muted);font-size:12.5px;margin:6px 0 0}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.row.between{justify-content:space-between}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--ok);flex:none;box-shadow:0 0 0 3px rgba(79,197,142,.18)}
+.dot.bad{background:var(--crit);box-shadow:0 0 0 3px rgba(240,96,79,.2)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin:10px 0 0;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.banner{border-radius:10px;padding:10px 12px;font-size:13px;background:rgba(240,96,79,.13);border:1px solid rgba(240,96,79,.4);color:#ffd3cd}
+
+.chip{display:inline-block;font-family:var(--f-mono);font-size:10.5px;font-weight:500;letter-spacing:.06em;padding:2px 6px;border-radius:5px;line-height:1.3;white-space:nowrap}
+.chip.alto{background:rgba(79,197,142,.18);color:#8fe2b9}
+.chip.medio{background:rgba(239,178,61,.18);color:#f6cf82}
+.chip.bajo,.chip.vacio{background:rgba(240,96,79,.2);color:#ffaa9f}
+.chip.err{background:rgba(143,167,180,.22);color:#c8d6de}
+.chip.on{background:rgba(74,182,230,.2);color:#9fdbf6}
+.chip.lock{background:rgba(240,96,79,.85);color:#fff}
+
+/* lista de depósitos en la app */
+.tanklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.trow{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s}
+.trow:hover{border-color:rgba(74,182,230,.5)}
+.trow.stale{opacity:.6}
+.trow-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.trow-head b{font-weight:600}
+.trow-meta{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:7px;font-size:12px;color:var(--muted);font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.trow-meta .pct{color:var(--ink);font-weight:500}
+.bar{position:relative;height:8px;border-radius:5px;background:rgba(255,255,255,.08);margin-top:8px;overflow:hidden}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--water-deep),var(--water));border-radius:5px;transition:width .3s}
+.bar .mark{position:absolute;top:0;bottom:0;width:2px}
+.bar .mark.low{background:var(--crit)} .bar .mark.high{background:var(--ok)}
+pre.json{margin:8px 0 0;max-height:240px;overflow:auto;font-family:var(--f-mono);font-size:11.5px;line-height:1.5;background:rgba(0,0,0,.25);border-radius:8px;padding:10px;color:#bfe3f4}
+details summary{cursor:pointer;font-weight:500}
+
+/* control */
+.ctl-head{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.ctl-head .num{font-size:20px;font-weight:500}
+.ctl-pump{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:8px}
+.ctl-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.card.sel{border-color:var(--water);box-shadow:0 0 0 1px var(--water) inset}
+.range{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;margin-top:10px;font-size:13px}
+.range input{grid-column:1 / -1;width:100%;accent-color:var(--water)}
+.range output{font-family:var(--f-mono)}
+
+/* fallas */
+.flist{display:flex;flex-direction:column}
+.fitem{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.fitem:first-child{border-top:0}
+.fitem .lbl{min-width:0}
+.fitem .lbl small{display:block;color:var(--muted);font-size:11.5px;font-family:var(--f-mono)}
+.scenario{background:linear-gradient(180deg,rgba(240,96,79,.14),rgba(240,96,79,.05));border-color:rgba(240,96,79,.35)}
+
+/* alertas */
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.log li{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:8px 10px;border-radius:8px;background:var(--raise);border-left:3px solid var(--info);font-size:13px}
+.log li.ok{border-left-color:var(--ok)} .log li.warn{border-left-color:var(--warn)} .log li.crit{border-left-color:var(--crit);background:rgba(240,96,79,.1)}
+.log time{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);padding-top:1px}
+.log .q{display:inline-block;margin-left:6px;font-family:var(--f-mono);font-size:10px;padding:0 5px;border-radius:4px;background:rgba(239,178,61,.2);color:#f6cf82}
+
+/* hardware */
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:6px 8px 6px 0;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:500;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em}
+td.mono{white-space:nowrap}
+ul.notes{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+code{font-family:var(--f-mono);font-size:12px;background:rgba(0,0,0,.25);padding:1px 5px;border-radius:4px}
+pre.code{margin:8px 0 0;overflow:auto;font-family:var(--f-mono);font-size:11.5px;line-height:1.5;background:rgba(0,0,0,.28);border-radius:8px;padding:10px;color:#d6e6ee}
+.led{display:inline-block;width:9px;height:9px;border-radius:50%;background:#33434c;vertical-align:middle}
+.led.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.led.lock{background:var(--crit);box-shadow:0 0 6px var(--crit)}
+
+/* ---------- asistente ---------- */
+#assistant{position:fixed;z-index:14;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));width:370px;max-height:42vh;display:flex;flex-direction:column;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden}
+#assistant header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+#assistant header h2{margin:0;font-family:var(--f-display);font-weight:600;font-size:16px;display:flex;align-items:center;gap:8px}
+#assistant .log{padding:10px;overflow-y:auto}
+.speaking{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.speaking.on{background:var(--water);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+
+/* ---------- etiquetas 3D ---------- */
+#labels{position:fixed;inset:0;pointer-events:none;z-index:5;overflow:hidden}
+.tag{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;background:rgba(12,22,28,.86);border:1px solid rgba(173,205,222,.22);border-radius:8px;padding:5px 8px;white-space:nowrap;font-size:12px;line-height:1.3;will-change:transform}
+.tag::after{content:"";position:absolute;left:50%;bottom:-5px;width:8px;height:8px;background:inherit;border-right:1px solid rgba(173,205,222,.22);border-bottom:1px solid rgba(173,205,222,.22);transform:translateX(-50%) rotate(45deg)}
+.tag b{font-weight:600;margin-right:6px}
+.tag .p{font-family:var(--f-mono);font-weight:500;margin-right:6px}
+.tag .s{display:flex;gap:4px;margin-top:3px;align-items:center}
+.tag.alarm{border-color:var(--crit);box-shadow:0 0 0 2px rgba(240,96,79,.35)}
+.tag.mini{padding:3px 7px;font-size:11px;color:var(--muted)}
+.tag.mini b{color:var(--ink)}
+
+/* avisos */
+#toasts{position:fixed;z-index:30;top:calc(var(--topbar-h) + 12px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;width:min(520px,calc(100% - 32px));pointer-events:none}
+.toast{pointer-events:auto;background:#3a1714;border:1px solid var(--crit);color:#ffe1dc;border-radius:10px;padding:10px 14px;font-size:13.5px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:tin .25s ease-out}
+.toast.ok{background:#12301f;border-color:var(--ok);color:#d7f5e5}
+@keyframes tin{from{transform:translateY(-8px);opacity:0}}
+
+#loading{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:var(--bg);color:var(--muted);font-family:var(--f-display);font-size:18px;letter-spacing:.04em;text-align:center;padding:0 24px}
+#loading .drop{width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--water);animation:pulse 1.2s infinite}
+
+@media (prefers-reduced-motion: reduce){ .bar i{transition:none} .speaking.on,#loading .drop{animation:none} .toast{animation:none} }
+
+/* ---------- móvil ---------- */
+@media (max-width: 760px){
+  .brand small{display:none}
+  .brand h1{font-size:18px}
+  #topbar{gap:8px 10px}
+  .tb-spacer{display:none}
+  #panelToggle{display:inline-flex}
+  #voiceBtn span,#camBtn span{display:none}
+  .clock{padding:6px 8px;font-size:12px}
+  .seg button{padding:6px 7px}
+  #assistant{display:none}
+  #panel{top:auto;left:0;right:0;width:auto;bottom:0;height:52%;border-radius:14px 14px 0 0;border-bottom:0;
+    padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px);transition:transform .25s ease}
+  #panel.collapsed{transform:translateY(calc(100% - 46px - env(safe-area-inset-bottom,0px)))}
+  .view{padding-left:16px;padding-right:16px}
+  .tab{font-size:14px}
+  .tag{font-size:11px;padding:4px 6px}
+  .tag .s{display:none}
+  .tag.mini{display:none!important}
+}
+@media (min-width: 761px) and (max-width: 1100px){
+  #assistant{width:300px;max-height:30vh}
+}
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="scene" tabindex="0" aria-label="Escena 3D de la granja: pozo, tanque de reserva, casa con tinaco, tres bebederos, bombas y gabinete ESP32"></canvas>
+<div id="labels"></div>
+
+<header id="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3c5 6.5 9 11.4 9 16a9 9 0 0 1-18 0c0-4.6 4-9.5 9-16z" fill="#4ab6e6"/><path d="M10 20h3l2-4 2.5 7 2-3H22" fill="none" stroke="#0d171d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div><h1>Monitor Hídrico</h1><small>Granja IoT · ESP32 + HC-SR04</small></div>
+  </div>
+  <div class="tb-group">
+    <span class="clock" id="clock" title="Hora simulada">Día 1 · 06:00</span>
+    <div class="seg" id="speedSeg" role="group" aria-label="Velocidad de simulación">
+      <button data-speed="0" aria-pressed="false" title="Pausa">II</button>
+      <button data-speed="1" aria-pressed="false" title="Tiempo real">1×</button>
+      <button data-speed="10" aria-pressed="false">10×</button>
+      <button data-speed="60" aria-pressed="true" title="1 segundo = 1 minuto">60×</button>
+      <button data-speed="300" aria-pressed="false">300×</button>
+    </div>
+  </div>
+  <label class="switch" title="El ESP32 enciende y apaga las bombas solo"><input type="checkbox" id="autoTop" checked><span class="track"></span>Automático</label>
+  <div class="tb-spacer"></div>
+  <div class="tb-group">
+    <button class="btn" id="voiceBtn" aria-pressed="false" aria-label="Voz del asistente" title="Voz del asistente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 8.5a5 5 0 0 1 0 7"/></svg><span>Voz apagada</span></button>
+    <button class="btn" id="camBtn" title="Volver a la vista general" aria-label="Vista general"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span>Vista general</span></button>
+    <button class="btn" id="panelToggle" aria-expanded="true">Panel</button>
+  </div>
+</header>
+
+<aside id="panel" aria-label="Aplicación de monitoreo">
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-monitor" aria-selected="true" data-view="monitor">App</button>
+    <button class="tab" role="tab" id="tab-control" aria-selected="false" data-view="control">Control</button>
+    <button class="tab" role="tab" id="tab-fallas" aria-selected="false" data-view="fallas">Fallas</button>
+    <button class="tab" role="tab" id="tab-alertas" aria-selected="false" data-view="alertas">Alertas<span class="badge" id="alertBadge" hidden>0</span></button>
+    <button class="tab" role="tab" id="tab-hardware" aria-selected="false" data-view="hardware">Piezas</button>
+  </div>
+  <div class="views">
+    <!-- APP / MONITOR -->
+    <section class="view" id="view-monitor">
+      <div class="card">
+        <div class="row between">
+          <div class="row"><span class="dot" id="connDot"></span><b id="connTitle">ESP32 conectado</b></div>
+          <span class="muted mono" id="connRssi">-58 dBm</span>
+        </div>
+        <dl class="kv">
+          <dt>Último dato recibido</dt><dd id="kvLast">—</dd>
+          <dt>Paquetes enviados</dt><dd id="kvSent">0</dd>
+          <dt>Fallidos · en cola</dt><dd id="kvFail">0 · 0</dd>
+        </dl>
+      </div>
+      <div class="banner" id="staleBanner" hidden></div>
+      <div class="sec-title">Depósitos</div>
+      <ul class="tanklist" id="appList"></ul>
+      <div class="card">
+        <details>
+          <summary>Último paquete que envió el ESP32 (JSON)</summary>
+          <pre class="json" id="jsonPkt">{}</pre>
+        </details>
+      </div>
+      <p class="hint">La app muestra lo último que recibió por WiFi. Toca un depósito para verlo en la escena.</p>
+    </section>
+
+    <!-- CONTROL -->
+    <section class="view" id="view-control" hidden>
+      <div class="card">
+        <div class="row between">
+          <h3>Modo automático</h3>
+          <label class="switch"><input type="checkbox" id="autoPanel" checked><span class="track"></span></label>
+        </div>
+        <p class="hint">Con el modo automático el ESP32 enciende la bomba cuando un depósito baja del umbral y la apaga sola al llegar al nivel de paro. Aun en manual, la bomba siempre se apaga sola al llenarse.</p>
+        <div class="range"><label for="lowR">Encender bomba al bajar de</label><output id="lowOut">25%</output><input type="range" id="lowR" min="10" max="50" step="5" value="25"></div>
+        <div class="range"><label for="highR">Apagar bomba al llegar a</label><output id="highOut">95%</output><input type="range" id="highR" min="70" max="98" step="1" value="95"></div>
+      </div>
+      <div id="ctlCards" style="display:flex;flex-direction:column;gap:12px"></div>
+    </section>
+
+    <!-- FALLAS -->
+    <section class="view" id="view-fallas" hidden>
+      <div class="card scenario">
+        <h3>Escenario: tubería rota hacia los bebederos</h3>
+        <p class="hint">Rompe el tramo principal que lleva el agua a los tres bebederos y enciende sus bombas. El agua sale del tanque de reserva pero ningún bebedero sube. El ESP32 lo detecta, apaga las bombas y avisa.</p>
+        <div class="ctl-btns"><button class="btn danger" id="scenarioBtn">Simular falla</button><button class="btn" id="repairAll">Reparar todo y rearmar</button></div>
+      </div>
+      <div class="card">
+        <h3>Detección de fugas</h3>
+        <div class="range"><label for="winR">Tiempo con la bomba encendida sin que suba el nivel</label><output id="winOut">5 min</output><input type="range" id="winR" min="1" max="10" step="1" value="5"></div>
+        <p class="hint">Si en ese tiempo el depósito sube menos del 25 % de lo que debería (caudal × tiempo), se considera fuga.</p>
+      </div>
+      <div class="sec-title">Tuberías</div>
+      <div class="card"><div class="flist" id="pipeList"></div></div>
+      <div class="sec-title">Sensores HC-SR04</div>
+      <div class="card"><div class="flist" id="sensorList"></div></div>
+      <div class="sec-title">Comunicación y fuente</div>
+      <div class="card">
+        <div class="flist">
+          <div class="fitem"><div class="lbl">Perder conexión WiFi<small>El ESP32 sigue controlando, la app deja de recibir</small></div><label class="switch bad"><input type="checkbox" id="wifiFault"><span class="track"></span></label></div>
+          <div class="fitem"><div class="lbl">Sequía en el pozo<small>El acuífero deja de recargar el pozo</small></div><label class="switch bad"><input type="checkbox" id="droughtFault"><span class="track"></span></label></div>
+        </div>
+      </div>
+      <div class="sec-title">Bombas bloqueadas</div>
+      <div class="card"><div class="flist" id="lockList"></div></div>
+    </section>
+
+    <!-- ALERTAS -->
+    <section class="view" id="view-alertas" hidden>
+      <div class="row between"><div class="sec-title" style="margin:0">Registro del asistente</div><button class="btn small" id="clearLog">Limpiar</button></div>
+      <ul class="log" id="logFull"></ul>
+    </section>
+
+    <!-- HARDWARE -->
+    <section class="view" id="view-hardware" hidden>
+      <div class="card">
+        <h3>Piezas y su función en el modelo</h3>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Pieza</th><th>En el modelo</th><th>Para qué sirve</th></tr></thead>
+          <tbody>
+            <tr><td>ESP32</td><td class="mono">1</td><td>Lee los 6 sensores, decide cuándo encender cada bomba, detecta fugas y envía los datos por WiFi a la app.</td></tr>
+            <tr><td>HC-SR04</td><td class="mono">6</td><td>Uno por depósito. Mide la distancia hasta el agua con ultrasonido; con eso se calcula el nivel.</td></tr>
+            <tr><td>Relé 2 canales</td><td class="mono">3 (6 canales)</td><td>Encienden V0 y B1–B5. El optoacoplador aísla al ESP32 de los motores.</td></tr>
+            <tr><td>Mini bomba 3–5 V</td><td class="mono">5 + V0</td><td>Tienen 4: alcanzan para B1–B4. Para B5 (casa) y V0 (entrada de la red) necesitan otra bomba o una electroválvula.</td></tr>
+            <tr><td>MB102</td><td class="mono">1</td><td>Da 5 V a relés y bombas y 3.3 V a los sensores. Su GND se une con el GND del ESP32.</td></tr>
+            <tr><td>Jumpers</td><td class="mono">—</td><td>Conexiones en la protoboard: M-M en la protoboard, M-H y H-H hacia los módulos.</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <h3>Conexiones sugeridas (GPIO)</h3>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Depósito</th><th>TRIG</th><th>ECHO</th><th>Actuador</th><th>Relé</th><th>Estado</th></tr></thead>
+          <tbody id="pinTable"></tbody>
+        </table></div>
+        <p class="hint">ECHO usa los pines 34, 35, 36 y 39, que solo sirven como entrada. Los GPIO 16 y 17 están libres en el ESP32-WROOM (no en WROVER).</p>
+      </div>
+      <div class="card">
+        <h3>Cómo se calcula el nivel</h3>
+        <p class="hint" style="color:var(--ink)">El HC-SR04 mide el tiempo del eco: <code>d = t × 0.0343 / 2</code> (cm). Con la distancia al fondo vacío <code>H</code> y la distancia cuando está lleno <code>d_lleno</code>:</p>
+        <pre class="code">nivel % = (H − d) / (H − d_lleno) × 100</pre>
+        <p class="hint">El HC-SR04 no mide menos de 2 cm: dejen al menos 2–3 cm entre el sensor y el agua cuando el depósito esté lleno.</p>
+      </div>
+      <div class="card">
+        <h3>Notas para armar la maqueta</h3>
+        <ul class="notes">
+          <li>El ECHO del HC-SR04 sale a 5 V si lo alimentan con 5 V, y el ESP32 trabaja a 3.3 V. Aliméntenlo con 3.3 V (su modelo acepta 3–5.5 V) o pongan un divisor de 1 kΩ y 2 kΩ en ECHO.</li>
+          <li>Las bombas no se conectan a un pin del ESP32: van por el contacto COM/NO del relé hacia el riel de 5 V del MB102.</li>
+          <li>Cada mini bomba consume 100–200 mA. Si van a encender varias a la vez, alimenten el MB102 con un adaptador de 9–12 V en vez de USB.</li>
+          <li>Las mini bombas son sumergibles: van dentro del depósito de donde sacan el agua. En la escena están afuera para que se vean.</li>
+          <li>Si el ESP32 pierde el WiFi, el control sigue funcionando porque la lógica corre en el ESP32. Solo se pierde el reporte a la app.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <details>
+          <summary>Lógica de detección de fuga (Arduino)</summary>
+<pre class="code">// Se revisa cada ciclo mientras la bomba está encendida
+if (bombaOn[i]) {
+  float min = (millis() - tInicio[i]) / 60000.0;
+  if (min &gt;= VENTANA_MIN) {
+    float subio    = litros(destino[i]) - litrosInicio[i]
+                   + salidaConocida[i];   // otras bombas + consumo
+    float esperado = CAUDAL_LPM[i] * min;
+    if (subio &lt; esperado * 0.25) {
+      digitalWrite(RELE[i], LOW);        // apaga la bomba
+      bloqueada[i] = true;
+      enviarAlerta("Posible tubería dañada", i);
+    } else {
+      tInicio[i] = millis();             // nueva ventana
+      litrosInicio[i] = litros(destino[i]);
+      salidaConocida[i] = 0;
+    }
+  }
+}</pre>
+        </details>
+      </div>
+    </section>
+  </div>
+</aside>
+
+<section id="assistant" aria-live="polite">
+  <header><h2><span class="speaking" id="speakDot"></span>Asistente</h2><button class="btn small" id="openAlerts">Ver todo</button></header>
+  <ul class="log" id="logMini"></ul>
+</section>
+<div id="toasts"></div>
+<div id="loading"><div class="drop"></div><div id="loadingText">Cargando la escena 3D…</div></div>
+
+<script>
+  // Aviso si Three.js no carga (sin internet o bloqueado)
+  setTimeout(function(){ if(!window.__sceneReady){ var t=document.getElementById('loadingText'); if(t) t.textContent='No se pudo cargar la librería 3D (Three.js). Revisa tu conexión a internet y recarga la página.'; } }, 12000);
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =====================================================================
+   1. MODELO DE DATOS
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const nf = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 0 });
+const pct = f => Math.round(f * 100) + '%';
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const cfg = { auto: true, low: 0.25, high: 0.95, dry: 0.08, win: 5, speed: 60, voice: false, wifi: true, drought: false };
+
+const TANKS = {
+  pozo:     { name: 'Pozo',                 cap: 5000, level: 0.55, consume: 0,   hCm: 60, filler: 'V0', trig: 4,  echo: 34 },
+  reserva:  { name: 'Tanque de reserva',    cap: 2000, level: 0.50, consume: 0,   hCm: 30, filler: 'B1', trig: 5,  echo: 35 },
+  casa:     { name: 'Tanque de la casa',    cap: 600,  level: 0.62, consume: 3.5, hCm: 22, filler: 'B5', trig: 18, echo: 36 },
+  vacas:    { name: 'Bebedero de vacas',    cap: 300,  level: 0.80, consume: 4.5, hCm: 12, filler: 'B2', trig: 19, echo: 39 },
+  caballos: { name: 'Bebedero de caballos', cap: 200,  level: 0.48, consume: 3.2, hCm: 12, filler: 'B3', trig: 21, echo: 16 },
+  cerdos:   { name: 'Bebedero de cerdos',   cap: 150,  level: 0.31, consume: 2.6, hCm: 10, filler: 'B4', trig: 22, echo: 17 },
+};
+const TANK_IDS = Object.keys(TANKS);
+
+const ACTS = {
+  V0: { name: 'Llave de entrada (red)', type: 'valve', src: null,      dst: 'pozo',     flow: 90, relay: 'Relé 1 · CH1', pin: 23, breaks: ['entrada'] },
+  B1: { name: 'Bomba del pozo',         type: 'pump',  src: 'pozo',    dst: 'reserva',  flow: 60, relay: 'Relé 1 · CH2', pin: 25, breaks: ['pozo'] },
+  B2: { name: 'Bomba bebedero vacas',   type: 'pump',  src: 'reserva', dst: 'vacas',    flow: 24, relay: 'Relé 2 · CH1', pin: 26, breaks: ['troncal', 'vacas'] },
+  B3: { name: 'Bomba bebedero caballos',type: 'pump',  src: 'reserva', dst: 'caballos', flow: 22, relay: 'Relé 2 · CH2', pin: 27, breaks: ['troncal', 'caballos'] },
+  B4: { name: 'Bomba bebedero cerdos',  type: 'pump',  src: 'reserva', dst: 'cerdos',   flow: 20, relay: 'Relé 3 · CH1', pin: 32, breaks: ['troncal', 'cerdos'] },
+  B5: { name: 'Bomba tanque casa',      type: 'pump',  src: 'reserva', dst: 'casa',     flow: 30, relay: 'Relé 3 · CH2', pin: 33, breaks: ['casa'] },
+};
+const ACT_IDS = Object.keys(ACTS);
+const TROUGH_PUMPS = ['B2', 'B3', 'B4'];
+
+const BREAKS = {
+  entrada:  { name: 'Red de agua → pozo',          pos: V(-20, 1.15, 6) },
+  pozo:     { name: 'Pozo → tanque de reserva',    pos: V(-9.8, 0.42, 1.5) },
+  troncal:  { name: 'Tramo principal a bebederos', pos: V(2.5, 0.2, 2.0), note: 'Lleva las 3 tuberías de los bebederos' },
+  vacas:    { name: 'Ramal bebedero vacas',        pos: V(8, 0.2, -4) },
+  caballos: { name: 'Ramal bebedero caballos',     pos: V(10, 0.2, 2.0) },
+  cerdos:   { name: 'Ramal bebedero cerdos',       pos: V(8.8, 0.2, 6.5) },
+  casa:     { name: 'Tubería a la casa',           pos: V(-7.5, 0.2, -5) },
+};
+
+for (const id of TANK_IDS) {
+  const t = TANKS[id];
+  Object.assign(t, { id, L: t.level * t.cap, reading: t.level, sensorFail: false, lowSince: null, flags: {} });
+}
+for (const id of ACT_IDS) {
+  Object.assign(ACTS[id], { id, on: false, mode: null, since: 0, locked: false, faultAt: -1, holdUntil: -1, chkT: 0, chkL: 0, chkOut: 0, waitLogged: false });
+}
+for (const k in BREAKS) Object.assign(BREAKS[k], { key: k, broken: false, leaked: 0 });
+
+let simMin = 6 * 60;          // 06:00 del día 1
+let mainDiagAt = -999;
+const level = t => t.L / t.cap;
+
+function stateOf(r) {
+  if (r === null) return { k: 'err', t: 'SIN SENSOR' };
+  if (r <= 0.03) return { k: 'vacio', t: 'VACÍO' };
+  if (r <= cfg.low) return { k: 'bajo', t: 'BAJO' };
+  if (r >= 0.75) return { k: 'alto', t: 'ALTO' };
+  return { k: 'medio', t: 'MEDIO' };
+}
+function clockStr(m, withDay = true) {
+  const d = Math.floor(m / 1440) + 1, mm = Math.floor(m % 1440);
+  const s = String(Math.floor(mm / 60)).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0');
+  return withDay ? `Día ${d} · ${s}` : s;
+}
+const distCm = t => t.reading === null ? null : 2.5 + (1 - t.reading) * t.hCm;
+const brokenKey = a => a.breaks.find(k => BREAKS[k].broken) || null;
+function srcOk(a, margin = 0.07) {
+  if (!a.src) return true;
+  const r = TANKS[a.src].reading;
+  return r !== null && r > cfg.dry + margin;
+}
+
+/* =====================================================================
+   2. ASISTENTE (registro, voz, avisos)
+   ===================================================================== */
+const logEntries = [];
+let unread = 0;
+const lastMsg = new Map();
+function log(sev, text, opts = {}) {
+  const key = opts.key || text;
+  const prev = lastMsg.get(key);
+  if (prev !== undefined && simMin - prev < (opts.every ?? 3)) return;
+  lastMsg.set(key, simMin);
+  const e = { sev, text, at: simMin, queued: !cfg.wifi && !opts.local };
+  logEntries.unshift(e);
+  if (logEntries.length > 120) logEntries.pop();
+  if (currentView !== 'alertas' && (sev === 'crit' || sev === 'warn')) unread++;
+  renderLog();
+  if (sev === 'crit') toast(text);
+  if (cfg.voice && (sev === 'crit' || sev === 'warn' || opts.speak)) speak(text);
+}
+function renderLog() {
+  const li = e => `<li class="${e.sev}"><time>${clockStr(e.at, false)}</time><span>${e.text}${e.queued ? '<span class="q">en cola</span>' : ''}</span></li>`;
+  $('#logMini').innerHTML = logEntries.slice(0, 6).map(li).join('');
+  $('#logFull').innerHTML = logEntries.map(li).join('') || '<li class="info"><time>—</time><span>Sin mensajes.</span></li>';
+  const b = $('#alertBadge'); b.hidden = unread === 0; b.textContent = unread > 9 ? '9+' : unread;
+}
+function toast(text, kind = '') {
+  const d = document.createElement('div');
+  d.className = 'toast ' + kind; d.textContent = text;
+  $('#toasts').appendChild(d);
+  while ($('#toasts').children.length > 3) $('#toasts').firstChild.remove();
+  setTimeout(() => d.remove(), 6500);
+}
+let esVoice = null;
+function pickVoice() {
+  const vs = speechSynthesis.getVoices();
+  esVoice = vs.find(v => /^es[-_](MX|US|419)/i.test(v.lang)) || vs.find(v => /^es/i.test(v.lang)) || null;
+}
+if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  if (speechSynthesis.pending) speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text.replace(/B(\d)/g, 'bomba $1').replace(/V0/g, 'llave cero').replace(/·/g, ','));
+  u.lang = esVoice ? esVoice.lang : 'es-MX'; if (esVoice) u.voice = esVoice; u.rate = 1.05;
+  u.onstart = () => $('#speakDot').classList.add('on');
+  u.onend = u.onerror = () => $('#speakDot').classList.remove('on');
+  speechSynthesis.speak(u);
+}
+
+/* =====================================================================
+   3. LÓGICA DEL ESP32 (control, protección y detección de fugas)
+   ===================================================================== */
+function startAct(a, mode) {
+  const dst = TANKS[a.dst];
+  Object.assign(a, { on: true, mode, since: simMin, chkT: simMin, chkL: dst.reading * dst.cap, chkOut: 0, waitLogged: false });
+}
+function stopAct(a) { a.on = false; a.mode = null; }
+
+function requestFill(tid) {
+  const t = TANKS[tid], a = ACTS[t.filler];
+  if (a.on) { log('info', `${a.id} ya está llenando ${t.name}. Se apagará sola al ${pct(cfg.high)}.`, { local: true }); return; }
+  if (a.locked) { log('warn', `${a.id} está bloqueada por una posible fuga. Repara la tubería y rearma la bomba en la pestaña Fallas.`, { local: true }); return; }
+  if (t.reading === null) { log('warn', `No se puede llenar ${t.name}: su sensor no responde y la bomba no sabría cuándo parar.`, { local: true }); return; }
+  if (t.reading >= cfg.high) { log('ok', `${t.name} ya está lleno (${pct(t.reading)}). ${a.id} no se enciende para no derramar agua.`, { local: true, speak: true }); return; }
+  if (!srcOk(a, 0.02)) { log('warn', `No hay suficiente agua en ${TANKS[a.src].name} (${pct(TANKS[a.src].reading ?? 0)}). ${a.id} no se enciende para no trabajar en seco.`, { local: true }); return; }
+  startAct(a, 'manual');
+  log('info', `Llenado manual de ${t.name}: ${a.id} encendida. Se apagará sola al llegar a ${pct(cfg.high)}.`, { local: true, every: 0 });
+}
+function requestStop(tid) {
+  const t = TANKS[tid], a = ACTS[t.filler];
+  if (!a.on) return;
+  stopAct(a); a.holdUntil = simMin + 15;
+  log('info', `${a.id} apagada manualmente. El modo automático espera 15 min antes de volver a encenderla.`, { local: true, every: 0 });
+}
+function useWater(tid, frac, why) {
+  const t = TANKS[tid];
+  t.L = Math.max(0, t.L - t.cap * frac);
+  log('info', `${why} ${t.name} bajó a ${pct(level(t))}.`, { local: true, every: 0 });
+}
+
+function physics(dt) {
+  // recarga natural del acuífero
+  if (!cfg.drought) TANKS.pozo.L += 7 * dt;
+  // consumo de animales y casa
+  for (const id of TANK_IDS) {
+    const t = TANKS[id];
+    if (t.consume) t.L -= t.consume * dt * (0.75 + Math.random() * 0.5);
+  }
+  // bombas y válvula
+  for (const id of ACT_IDS) {
+    const a = ACTS[id]; if (!a.on) continue;
+    const src = a.src ? TANKS[a.src] : null, dst = TANKS[a.dst];
+    let amt = a.flow * dt;
+    if (src) { amt = Math.min(amt, Math.max(0, src.L)); src.L -= amt; }
+    const bk = brokenKey(a);
+    if (bk) BREAKS[bk].leaked += amt; else dst.L += amt;
+  }
+  for (const id of TANK_IDS) { const t = TANKS[id]; t.L = clamp(t.L, 0, t.cap); }
+}
+
+function readSensors() {
+  for (const id of TANK_IDS) {
+    const t = TANKS[id];
+    t.reading = t.sensorFail ? null : clamp(level(t) + (Math.random() - 0.5) * 0.004, 0, 1);
+  }
+}
+
+function controlStep(dt) {
+  const newFaults = [];
+  for (const id of ACT_IDS) {
+    const a = ACTS[id], dst = TANKS[a.dst], r = dst.reading;
+    if (a.on) {
+      // salida conocida del depósito destino (otras bombas + consumo estimado)
+      let out = dst.consume;
+      for (const b of ACT_IDS) if (ACTS[b].on && ACTS[b].src === a.dst) out += ACTS[b].flow;
+      a.chkOut += out * dt;
+
+      if (r === null) { stopAct(a); log('crit', `El sensor de ${dst.name} no responde. ${a.id} se apagó por seguridad.`); continue; }
+      if (r >= cfg.high) { stopAct(a); log('ok', `${dst.name} lleno (${pct(r)}). ${a.id} se apagó automáticamente.`, { every: 0 }); continue; }
+      if (a.src) {
+        const rs = TANKS[a.src].reading;
+        if (rs === null) { stopAct(a); log('crit', `El sensor de ${TANKS[a.src].name} no responde. ${a.id} se apagó por seguridad.`); continue; }
+        if (rs <= cfg.dry) { stopAct(a); log('warn', `${TANKS[a.src].name} casi vacío (${pct(rs)}). ${a.id} se detuvo para no trabajar en seco.`); continue; }
+      }
+      const el = simMin - a.chkT;
+      if (el >= cfg.win) {
+        const now = r * dst.cap;
+        const rise = now - a.chkL + a.chkOut;
+        const expected = a.flow * el;
+        if (rise < expected * 0.25) {
+          stopAct(a); a.locked = true; a.faultAt = simMin;
+          newFaults.push(id);
+          log('crit', `¡Cuidado! ${a.id} lleva ${Math.round(el)} min encendida (≈${nf.format(expected)} L bombeados) y el nivel de ${dst.name} no sube. Puede haber una tubería dañada. La bomba se apagó y quedó bloqueada.`, { every: 0 });
+        } else { a.chkT = simMin; a.chkL = now; a.chkOut = 0; }
+      }
+    } else {
+      if (!cfg.auto || a.locked || r === null || simMin < a.holdUntil) continue;
+      if (r <= cfg.low) {
+        if (srcOk(a)) {
+          startAct(a, 'auto');
+          log('info', `${dst.name} en nivel bajo (${pct(r)}). Se enciende ${a.id} automáticamente.`);
+        } else if (!a.waitLogged) {
+          a.waitLogged = true;
+          log('warn', `${dst.name} necesita agua, pero ${TANKS[a.src].name} no tiene suficiente. ${a.id} queda en espera.`);
+        }
+      }
+    }
+  }
+  // diagnóstico conjunto: si fallan las líneas de varios bebederos, el problema es el tramo común
+  if (newFaults.some(f => TROUGH_PUMPS.includes(f)) && simMin - mainDiagAt > 20) {
+    const recent = TROUGH_PUMPS.filter(k => ACTS[k].locked && simMin - ACTS[k].faultAt < 30);
+    if (recent.length >= 2) {
+      mainDiagAt = simMin;
+      const which = recent.length === 3 ? 'Ninguno de los tres bebederos sube' : `Los bebederos de ${recent.map(k => ACTS[k].dst).join(' y ')} no suben`;
+      log('crit', `${which} aunque sus bombas están funcionando. La falla probablemente está en la tubería principal que comparten. Revisa el tramo entre las bombas y los corrales.`, { every: 0 });
+    }
+  }
+}
+
+function monitorStep() {
+  for (const id of TANK_IDS) {
+    const t = TANKS[id], r = t.reading, a = ACTS[t.filler];
+    if (r === null) {
+      if (!t.flags.sensor) { t.flags.sensor = true; log('crit', `El sensor HC-SR04 de ${t.name} no responde (eco fuera de rango). Revisa el cable TRIG/ECHO.`); }
+      continue;
+    } else if (t.flags.sensor) { t.flags.sensor = false; log('ok', `El sensor de ${t.name} volvió a responder: ${distCm(t).toFixed(1)} cm.`); }
+
+    if (r <= cfg.low) {
+      if (t.lowSince === null) t.lowSince = simMin;
+      const mins = simMin - t.lowSince;
+      if (!a.on && mins >= 10 && !t.flags.lowLong) {
+        t.flags.lowLong = true;
+        const why = a.locked ? `${a.id} está bloqueada por una falla`
+          : !cfg.auto ? 'el modo automático está apagado'
+          : (a.src && !srcOk(a)) ? `${TANKS[a.src].name} no tiene agua suficiente`
+          : simMin < a.holdUntil ? `${a.id} se apagó manualmente` : 'la bomba no arrancó';
+        log('warn', `${t.name} lleva ${Math.round(mins)} min en nivel bajo (${pct(r)}) y no se está llenando: ${why}.`);
+      }
+    } else if (r > cfg.low + 0.05) { t.lowSince = null; t.flags.lowLong = false; }
+
+    if (r <= 0.03 && !t.flags.empty) { t.flags.empty = true; log('crit', `${t.name} está vacío.`); }
+    else if (r > 0.08) t.flags.empty = false;
+  }
+}
+
+function simStep(dt) {
+  simMin += dt;
+  physics(dt);
+  readSensors();
+  controlStep(dt);
+  monitorStep();
+}
+
+/* ---------- telemetría (lo que "manda" el ESP32 a la app) ---------- */
+const tele = { sent: 0, failed: 0, queued: 0, lastRx: performance.now(), rssi: -58 };
+let appData = null;
+function snapshot() {
+  const tanques = {}, actuadores = {};
+  for (const id of TANK_IDS) {
+    const t = TANKS[id], d = distCm(t);
+    tanques[id] = { nivel_pct: t.reading === null ? null : Math.round(t.reading * 100), litros: t.reading === null ? null : Math.round(t.reading * t.cap), distancia_cm: d === null ? null : +d.toFixed(1), estado: stateOf(t.reading).t.toLowerCase() };
+  }
+  for (const id of ACT_IDS) { const a = ACTS[id]; actuadores[id] = a.locked ? 'bloqueada' : a.on ? 'encendida' : 'apagada'; }
+  return { dispositivo: 'esp32-granja-01', hora: clockStr(simMin, false), rssi_dbm: tele.rssi, modo: cfg.auto ? 'automatico' : 'manual', tanques, actuadores,
+    fallas: ACT_IDS.filter(k => ACTS[k].locked).map(k => `posible_fuga_${k}`) };
+}
+let nextTx = 0;
+function telemetry(now) {
+  if (now < nextTx) return;
+  nextTx = now + 2000;
+  tele.rssi = cfg.wifi ? -54 - Math.round(Math.random() * 9) : null;
+  const pkt = snapshot();
+  if (cfg.wifi) {
+    tele.sent++;
+    if (tele.queued > 0) {
+      const n = tele.queued; tele.queued = 0;
+      logEntries.forEach(e => e.queued = false);
+      log('ok', `Conexión WiFi restablecida. Se enviaron ${n} paquetes que estaban en cola.`, { every: 0 });
+    }
+    appData = pkt; tele.lastRx = now;
+    $('#jsonPkt').textContent = JSON.stringify(pkt, null, 2);
+    fx.packet(true);
+  } else { tele.failed++; tele.queued++; fx.packet(false); }
+  fx.sensorPulse();
+}
+
+/* =====================================================================
+   4. ESCENA 3D
+   ===================================================================== */
+const canvas = $('#scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#b9d7ea');
+scene.fog = new THREE.Fog('#b9d7ea', 75, 150);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 400);
+const HOME = { pos: V(19, 27, 36), target: V(-5.5, 0, 0.5) };
+camera.position.copy(HOME.pos);
+const controls = new OrbitControls(camera, canvas);
+controls.target.copy(HOME.target);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.minDistance = 5; controls.maxDistance = 95;
+
+scene.add(new THREE.HemisphereLight('#eaf5ff', '#56683a', 1.1));
+const sun = new THREE.DirectionalLight('#fff2dc', 2.3);
+sun.position.set(28, 42, 18);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -38, right: 38, top: 38, bottom: -38, near: 1, far: 120 });
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+
+const M = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, ...o });
+const MAT = {
+  grass: M('#7fae58'), dirt: M('#b39467'), concrete: M('#b9b8b1'), stone: M('#9b958a'), wood: M('#8a5f3a'), woodDark: M('#5e3f26'),
+  metal: M('#8d989e', { metalness: 0.6, roughness: 0.4 }), pvc: M('#dfe2dc', { roughness: 0.55 }), pvcDark: M('#7f8a8f', { roughness: 0.6 }),
+  roof: M('#a8483a'), wall: M('#eadcc3'), trim: M('#c6b597'), glassWin: M('#9ccbe4', { roughness: 0.2, metalness: 0.1 }),
+  pumpBlue: M('#2c6fa8', { roughness: 0.5 }), pcbBlue: M('#1f5fa8', { roughness: 0.6 }), silver: M('#d6dadc', { metalness: 0.7, roughness: 0.3 }),
+  water: new THREE.MeshStandardMaterial({ color: '#2d8fd2', transparent: true, opacity: 0.82, roughness: 0.12, metalness: 0.05, emissive: '#0a3756', emissiveIntensity: 0.35 }),
+  waterBright: new THREE.MeshBasicMaterial({ color: '#7fd3ff' }),
+  ledOff: M('#26343b', { roughness: 0.4 }),
+};
+const glass = (color = '#e8f1f5', opacity = 0.22) => new THREE.MeshStandardMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false, roughness: 0.25 });
+const ledMat = () => new THREE.MeshStandardMaterial({ color: '#26343b', emissive: '#000000', emissiveIntensity: 1.6, roughness: 0.4 });
+
+function mesh(geo, mat, x = 0, y = 0, z = 0, parent = scene, shadow = true) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z);
+  if (shadow) { m.castShadow = true; m.receiveShadow = true; }
+  parent.add(m); return m;
+}
+const box = (w, h, d, mat, x, y, z, p, s) => mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z, p, s);
+const cyl = (rt, rb, h, mat, x, y, z, p, seg = 24, s) => mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat, x, y, z, p, s);
+
+/* ---------- terreno con corte del pozo ---------- */
+const PIT = { x0: -18, x1: -10.5, z0: 2.2, z1: 12, depth: 4.8 };
+{
+  const s = new THREE.Shape();
+  s.moveTo(-70, -70); s.lineTo(70, -70); s.lineTo(70, 70); s.lineTo(-70, 70); s.lineTo(-70, -70);
+  const h = new THREE.Path();
+  // el plano se rota -90° en X: (x, y) → (x, 0, -y)
+  h.moveTo(PIT.x0, -PIT.z0); h.lineTo(PIT.x0, -PIT.z1); h.lineTo(PIT.x1, -PIT.z1); h.lineTo(PIT.x1, -PIT.z0); h.lineTo(PIT.x0, -PIT.z0);
+  s.holes.push(h);
+  const g = new THREE.ShapeGeometry(s); g.rotateX(-Math.PI / 2);
+  const ground = mesh(g, MAT.grass, 0, 0, 0, scene, false); ground.receiveShadow = true;
+
+  // textura de estratos del suelo para las paredes del corte
+  const c = document.createElement('canvas'); c.width = 64; c.height = 256;
+  const x = c.getContext('2d');
+  const bands = [[0, '#5b4530'], [0.1, '#86664a'], [0.42, '#b0916a'], [0.66, '#7f7b72'], [0.86, '#4c7b93']];
+  bands.forEach(([y0, col], i) => { const y1 = bands[i + 1] ? bands[i + 1][0] : 1; x.fillStyle = col; x.fillRect(0, y0 * 256, 64, (y1 - y0) * 256 + 1); });
+  for (let i = 0; i < 700; i++) { x.fillStyle = `rgba(0,0,0,${Math.random() * 0.18})`; x.fillRect(Math.random() * 64, Math.random() * 256, 2, 2); }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const w = PIT.x1 - PIT.x0, d = PIT.z1 - PIT.z0;
+  const pit = box(w, PIT.depth, d, new THREE.MeshStandardMaterial({ map: tex, side: THREE.BackSide, roughness: 1 }), (PIT.x0 + PIT.x1) / 2, -PIT.depth / 2, (PIT.z0 + PIT.z1) / 2, scene, false);
+  pit.receiveShadow = true;
+  // borde de madera del corte
+  const rim = M('#d9b44a');
+  box(w + 0.3, 0.12, 0.15, rim, (PIT.x0 + PIT.x1) / 2, 0.06, PIT.z0, scene);
+  box(w + 0.3, 0.12, 0.15, rim, (PIT.x0 + PIT.x1) / 2, 0.06, PIT.z1, scene);
+  box(0.15, 0.12, d, rim, PIT.x0, 0.06, (PIT.z0 + PIT.z1) / 2, scene);
+  box(0.15, 0.12, d, rim, PIT.x1, 0.06, (PIT.z0 + PIT.z1) / 2, scene);
+}
+// caminos y bases
+function pad(x, z, w, d, mat = MAT.dirt, y = 0.012) { const m = mesh(new THREE.PlaneGeometry(w, d), mat, x, y, z, scene, false); m.rotation.x = -Math.PI / 2; m.receiveShadow = true; return m; }
+pad(-4, -1, 6, 8.5, MAT.dirt);
+pad(3, 2, 14, 1.6, M('#a88d63'));
+pad(5, 5, 1.2, 4.6, M('#a88d63'));
+pad(-12, -8.4, 1.4, 4.4, M('#a88d63'));
+pad(5, 7.5, 2.2, 2.2, MAT.concrete, 0.02);
+
+/* ---------- utilidades de modelado ---------- */
+const clickables = [];
+function tagClick(obj, data) { obj.traverse(o => { if (o.isMesh) { o.userData = { ...o.userData, ...data }; clickables.push(o); } }); }
+
+function makeSensor(pos, parent = scene) {
+  const g = new THREE.Group(); g.position.copy(pos); parent.add(g);
+  box(0.52, 0.05, 0.24, MAT.pcbBlue, 0, 0.08, 0, g);
+  cyl(0.09, 0.09, 0.1, MAT.silver, -0.13, 0.01, 0, g, 16);
+  cyl(0.09, 0.09, 0.1, MAT.silver, 0.13, 0.01, 0, g, 16);
+  const led = mesh(new THREE.SphereGeometry(0.035, 8, 8), ledMat(), 0, 0.12, 0.09, g, false);
+  return { group: g, led };
+}
+
+function makeCylTank({ x, z, baseY, r, h, wall = '#e8f1f5', wallOpacity = 0.22, lid = '#5d6b72' }) {
+  const g = new THREE.Group(); g.position.set(x, baseY, z); scene.add(g);
+  cyl(r, r, 0.08, MAT.pvcDark, 0, 0.04, 0, g, 40);
+  const water = mesh(new THREE.CylinderGeometry(r * 0.965, r * 0.965, 1, 40), MAT.water, 0, 0, 0, g, false);
+  water.renderOrder = 1;
+  const wallM = mesh(new THREE.CylinderGeometry(r, r, h, 48, 1, true), glass(wall, wallOpacity), 0, h / 2, 0, g, false);
+  wallM.renderOrder = 2;
+  const rimMat = M(lid, { roughness: 0.5 });
+  for (const yy of [0.02, h]) { const t = mesh(new THREE.TorusGeometry(r, 0.045, 8, 48), rimMat, 0, yy, 0, g); t.rotation.x = Math.PI / 2; }
+  // tapa con boca de inspección (ahí va el sensor)
+  const lidM = mesh(new THREE.RingGeometry(0.75, r, 40), M(lid, { side: THREE.DoubleSide, roughness: 0.6 }), 0, h, 0, g);
+  lidM.rotation.x = -Math.PI / 2;
+  // marcas de umbral (rojo = encender, verde = apagar)
+  const lowRing = mesh(new THREE.TorusGeometry(r + 0.02, 0.03, 6, 48), new THREE.MeshBasicMaterial({ color: '#f0604f' }), 0, 0, 0, g, false);
+  const highRing = mesh(new THREE.TorusGeometry(r + 0.02, 0.03, 6, 48), new THREE.MeshBasicMaterial({ color: '#4fc58e' }), 0, 0, 0, g, false);
+  lowRing.rotation.x = highRing.rotation.x = Math.PI / 2;
+  const inner = h - 0.12;
+  // barra del sensor sobre la boca
+  box(1.6, 0.06, 0.08, MAT.metal, 0, h + 0.28, 0, g);
+  box(0.06, 0.28, 0.06, MAT.metal, -0.78, h + 0.14, 0, g);
+  box(0.06, 0.28, 0.06, MAT.metal, 0.78, h + 0.14, 0, g);
+  const sensor = makeSensor(V(0, h + 0.13, 0), g);
+  return {
+    group: g, sensor,
+    setLevel(f) { const hh = Math.max(0.001, f * inner); water.scale.y = hh; water.position.y = 0.08 + hh / 2; water.visible = f > 0.003; },
+    surfaceY: f => baseY + 0.08 + f * inner,
+    sensorY: baseY + h + 0.12,
+    setThresholds(lo, hi) { lowRing.position.y = 0.08 + lo * inner; highRing.position.y = 0.08 + hi * inner; },
+  };
+}
+
+function makeTrough({ x, z, len, h, d, color = '#a9a79f' }) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = Math.PI / 2; scene.add(g);
+  const mat = M(color); const t = 0.09;
+  box(len, 0.1, d, mat, 0, 0.05, 0, g);
+  box(len, h, t, mat, 0, h / 2, d / 2 - t / 2, g);
+  box(len, h, t, mat, 0, h / 2, -d / 2 + t / 2, g);
+  box(t, h, d, mat, len / 2 - t / 2, h / 2, 0, g);
+  box(t, h, d, mat, -len / 2 + t / 2, h / 2, 0, g);
+  const water = mesh(new THREE.BoxGeometry(len - 2 * t, 1, d - 2 * t), MAT.water, 0, 0, 0, g, false);
+  // poste y brazo del sensor
+  const px = -len / 2 - 0.25;
+  box(0.1, h + 0.85, 0.1, MAT.woodDark, px, (h + 0.85) / 2, 0, g);
+  box(len / 2 + 0.3, 0.07, 0.07, MAT.metal, px / 2 + 0.05, h + 0.8, 0, g);
+  const sensor = makeSensor(V(0, h + 0.62, 0), g);
+  const inner = h - 0.16;
+  return {
+    group: g, sensor,
+    setLevel(f) { const hh = Math.max(0.001, f * inner); water.scale.y = hh; water.position.y = 0.1 + hh / 2; water.visible = f > 0.003; },
+    surfaceY: f => 0.1 + f * inner, sensorY: h + 0.62,
+    setThresholds() {},
+  };
+}
+
+/* ---------- POZO ---------- */
+const WELL = { x: -14, z: 6, bottom: -4.2, depth: 3.6, r: 1.2 };
+const vis = {};
+{
+  const g = new THREE.Group(); g.position.set(WELL.x, 0, WELL.z); scene.add(g);
+  // pared del pozo bajo tierra (translúcida para ver el agua)
+  const shaftH = -WELL.bottom;
+  const shaft = mesh(new THREE.CylinderGeometry(WELL.r, WELL.r, shaftH, 40, 1, true), glass('#cbbfae', 0.3), 0, -shaftH / 2, 0, g, false);
+  shaft.renderOrder = 2;
+  for (let i = 1; i < 5; i++) { const ring = mesh(new THREE.TorusGeometry(WELL.r, 0.025, 6, 40), M('#8f8576'), 0, -i * 0.9, 0, g, false); ring.rotation.x = Math.PI / 2; }
+  cyl(WELL.r + 0.1, WELL.r + 0.1, 0.15, M('#6f6a60'), 0, WELL.bottom - 0.07, 0, g, 32);
+  // grava del fondo
+  for (let i = 0; i < 18; i++) { const a = Math.random() * Math.PI * 2, rr = Math.random() * 2.4 + 1.4; mesh(new THREE.DodecahedronGeometry(0.15 + Math.random() * 0.15), MAT.stone, Math.cos(a) * rr, -PIT.depth + 0.12, Math.sin(a) * rr + 1, g); }
+  const water = mesh(new THREE.CylinderGeometry(WELL.r - 0.08, WELL.r - 0.08, 1, 40), MAT.water, 0, 0, 0, g, false);
+  water.renderOrder = 1;
+  // brocal de piedra
+  mesh(new THREE.CylinderGeometry(1.62, 1.62, 0.9, 40, 1, true), MAT.stone, 0, 0.45, 0, g);
+  mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.9, 40, 1, true), M('#8a847a', { side: THREE.DoubleSide }), 0, 0.45, 0, g);
+  const top = mesh(new THREE.RingGeometry(1.15, 1.62, 40), M('#a9a397', { side: THREE.DoubleSide }), 0, 0.9, 0, g); top.rotation.x = -Math.PI / 2;
+  // marcas de umbral
+  const lowRing = mesh(new THREE.TorusGeometry(WELL.r + 0.03, 0.035, 6, 40), new THREE.MeshBasicMaterial({ color: '#f0604f' }), 0, 0, 0, g, false);
+  const highRing = mesh(new THREE.TorusGeometry(WELL.r + 0.03, 0.035, 6, 40), new THREE.MeshBasicMaterial({ color: '#4fc58e' }), 0, 0, 0, g, false);
+  lowRing.rotation.x = highRing.rotation.x = Math.PI / 2;
+  // postes y techito
+  box(0.18, 2.3, 0.18, MAT.wood, 0, 2.05, -1.4, g);
+  box(0.18, 2.3, 0.18, MAT.wood, 0, 2.05, 1.4, g);
+  box(0.12, 0.12, 3.0, MAT.wood, 0, 2.05, 0, g);
+  const r1 = box(2.1, 0.08, 3.5, MAT.roof, -0.82, 3.42, 0, g); r1.rotation.z = 0.55;
+  const r2 = box(2.1, 0.08, 3.5, MAT.roof, 0.82, 3.42, 0, g); r2.rotation.z = -0.55;
+  const sensor = makeSensor(V(0, 1.86, 0), g);
+  vis.pozo = {
+    group: g, sensor,
+    setLevel(f) { const hh = Math.max(0.001, f * WELL.depth); water.scale.y = hh; water.position.y = WELL.bottom + hh / 2; water.visible = f > 0.003; },
+    surfaceY: f => WELL.bottom + f * WELL.depth, sensorY: 1.86,
+    setThresholds(lo, hi) { lowRing.position.y = WELL.bottom + lo * WELL.depth; highRing.position.y = WELL.bottom + hi * WELL.depth; },
+  };
+  vis.pozo.anchor = V(WELL.x, 4.3, WELL.z);
+  vis.pozo.focus = V(WELL.x, -1.4, WELL.z + 1);
+  vis.pozo.view = V(0.45, 0.8, 1);
+}
+// toma de la red municipal y llave V0
+const valve = {};
+{
+  const g = new THREE.Group(); g.position.set(-24, 0, 6); scene.add(g);
+  cyl(0.16, 0.16, 1.3, M('#3f7fb5'), 0, 0.65, 0, g);
+  cyl(0.24, 0.24, 0.12, M('#2d5d86'), 0, 1.3, 0, g);
+  box(0.6, 0.9, 0.06, M('#2d5d86'), 0, 1.1, -0.45, g);
+  const vb = new THREE.Group(); vb.position.set(-21, 1.15, 6); scene.add(vb);
+  box(0.45, 0.32, 0.32, M('#b8862b', { metalness: 0.5, roughness: 0.4 }), 0, 0, 0, vb);
+  cyl(0.04, 0.04, 0.35, MAT.metal, 0, 0.3, 0, vb, 8);
+  valve.wheel = mesh(new THREE.TorusGeometry(0.2, 0.035, 8, 20), M('#c9372c'), 0, 0.47, 0, vb); valve.wheel.rotation.x = Math.PI / 2;
+  valve.led = mesh(new THREE.SphereGeometry(0.05, 8, 8), ledMat(), 0.24, 0.1, 0.17, vb, false);
+  tagClick(vb, { tank: 'pozo' });
+}
+
+/* ---------- TANQUE DE RESERVA (torre) ---------- */
+{
+  const tx = -4, tz = -3, H = 4.55;
+  for (const dx of [-1.5, 1.5]) for (const dz of [-1.5, 1.5]) box(0.18, H, 0.18, MAT.metal, tx + dx, H / 2, tz + dz);
+  // tirantes en X
+  const brace = (x1, z1, x2, z2) => { const len = Math.hypot(x2 - x1, z2 - z1); for (const s of [1, -1]) { const b = box(0.07, Math.hypot(len, H * 0.9), 0.07, MAT.metal, (x1 + x2) / 2, H / 2, (z1 + z2) / 2); const ang = Math.atan2(len, H * 0.9) * s; if (Math.abs(x2 - x1) > 0.1) b.rotation.z = ang; else b.rotation.x = ang; } };
+  brace(tx - 1.5, tz - 1.5, tx + 1.5, tz - 1.5); brace(tx - 1.5, tz + 1.5, tx + 1.5, tz + 1.5);
+  brace(tx - 1.5, tz - 1.5, tx - 1.5, tz + 1.5); brace(tx + 1.5, tz - 1.5, tx + 1.5, tz + 1.5);
+  box(3.8, 0.18, 3.8, M('#6f7b80', { metalness: 0.4 }), tx, H, tz);
+  // escalera
+  for (const lx of [-0.3, 0.3]) box(0.06, H, 0.06, MAT.metal, tx + lx, H / 2, tz + 1.75);
+  for (let y = 0.4; y < H; y += 0.45) box(0.6, 0.04, 0.04, MAT.metal, tx, y, tz + 1.75);
+  vis.reserva = makeCylTank({ x: tx, z: tz, baseY: H + 0.09, r: 1.7, h: 3.3 });
+  vis.reserva.anchor = V(tx + 2.4, H + 3.4, tz + 1.2);
+  vis.reserva.focus = V(tx, 5, tz);
+}
+
+/* ---------- CASA con tinaco ---------- */
+{
+  const cx = -12, cz = -13;
+  const g = new THREE.Group(); g.position.set(cx, 0, cz); scene.add(g);
+  box(6, 3, 5, MAT.wall, 0, 1.5, 0, g);
+  box(6.2, 0.3, 5.2, MAT.trim, 0, 0.15, 0, g);
+  box(6.4, 0.25, 5.4, M('#cfc7b8'), 0, 3.12, 0, g);
+  for (const [w, d, x, z] of [[6.4, 0.12, 0, 2.64], [6.4, 0.12, 0, -2.64], [0.12, 5.4, 3.14, 0], [0.12, 5.4, -3.14, 0]]) box(w, 0.4, d, MAT.trim, x, 3.44, z, g);
+  box(1.0, 2.0, 0.08, MAT.woodDark, -0.6, 1.0, 2.52, g);
+  box(1.1, 0.9, 0.08, MAT.glassWin, 1.6, 1.7, 2.52, g);
+  box(0.08, 0.9, 1.1, MAT.glassWin, 3.02, 1.7, -0.8, g);
+  box(0.08, 0.9, 1.1, MAT.glassWin, -3.02, 1.7, 0.6, g);
+  box(1.3, 0.12, 0.5, MAT.trim, -0.6, 2.1, 2.7, g);
+  box(1.9, 0.3, 1.9, MAT.concrete, 1.2, 3.4, 0, g);
+  // macetas
+  for (const px of [-1.6, 0.4]) { cyl(0.2, 0.15, 0.3, M('#b5603b'), px, 0.15, 2.85, g, 12); mesh(new THREE.IcosahedronGeometry(0.25, 0), M('#4f8a3a'), px, 0.45, 2.85, g); }
+  tagClick(g, { tank: 'casa' });
+  vis.casa = makeCylTank({ x: cx + 1.2, z: cz, baseY: 3.55, r: 0.85, h: 1.6, wall: '#2f3b42', wallOpacity: 0.38, lid: '#2a3238' });
+  vis.casa.anchor = V(cx - 3.2, 3.9, cz + 1.6);
+  vis.casa.focus = V(cx, 2.5, cz);
+}
+
+/* ---------- CORRALES, BEBEDEROS Y ANIMALES ---------- */
+const PENS = {
+  vacas:    { x0: 11, x1: 19, z0: -13, z1: -6, trough: { len: 3.2, h: 0.7, d: 0.95, color: '#a9a79f' } },
+  caballos: { x0: 11, x1: 19, z0: -3,  z1: 4,  trough: { len: 2.6, h: 0.82, d: 0.85, color: '#8f7a5f' } },
+  cerdos:   { x0: 11, x1: 19, z0: 7,   z1: 14, trough: { len: 2.4, h: 0.45, d: 0.85, color: '#9c9a92' } },
+};
+function fence(p) {
+  const posts = [], mat = MAT.wood;
+  const side = (ax, az, bx, bz) => {
+    const len = Math.hypot(bx - ax, bz - az), n = Math.ceil(len / 1.6);
+    for (let i = 0; i <= n; i++) { const t = i / n; box(0.14, 1.15, 0.14, mat, ax + (bx - ax) * t, 0.575, az + (bz - az) * t); }
+    for (const y of [0.45, 0.95]) { const r = box(len, 0.08, 0.06, mat, (ax + bx) / 2, y, (az + bz) / 2); r.rotation.y = -Math.atan2(bz - az, bx - ax); }
+  };
+  side(p.x0, p.z0, p.x1, p.z0); side(p.x1, p.z0, p.x1, p.z1); side(p.x1, p.z1, p.x0, p.z1); side(p.x0, p.z1, p.x0, p.z0);
+}
+for (const id in PENS) {
+  const p = PENS[id]; fence(p);
+  pad((p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2, p.x1 - p.x0 - 0.2, p.z1 - p.z0 - 0.2, M(id === 'cerdos' ? '#8d6b4a' : '#9bb365'), 0.008);
+  const cz = (p.z0 + p.z1) / 2;
+  vis[id] = makeTrough({ x: 12.3, z: cz, ...p.trough });
+  vis[id].anchor = V(12.3, p.trough.h + 1.9, cz);
+  vis[id].focus = V(14.5, 0.5, cz);
+}
+
+function makeCow() {
+  const g = new THREE.Group(), white = M('#f1eee6'), black = M('#2a2522'), pink = M('#e4a69c');
+  box(1.5, 0.75, 0.75, white, 0, 1.0, 0, g);
+  box(0.55, 0.45, 0.77, black, -0.2, 1.1, 0, g); box(0.32, 0.3, 0.77, black, 0.42, 0.92, 0, g);
+  for (const lx of [-0.55, 0.55]) for (const lz of [-0.25, 0.25]) box(0.16, 0.66, 0.16, white, lx, 0.33, lz, g);
+  box(0.06, 0.5, 0.06, white, -0.78, 0.85, 0, g);
+  const neck = new THREE.Group(); neck.position.set(0.72, 1.15, 0); g.add(neck);
+  box(0.46, 0.42, 0.42, white, 0.25, -0.05, 0, neck);
+  box(0.14, 0.24, 0.36, pink, 0.52, -0.14, 0, neck);
+  for (const s of [-1, 1]) { box(0.06, 0.15, 0.06, M('#e8e0c6'), 0.18, 0.22, 0.15 * s, neck); box(0.06, 0.1, 0.2, white, 0.12, 0.08, 0.28 * s, neck); }
+  g.userData.neck = neck; g.userData.dip = 0.9; return g;
+}
+function makeHorse(color = '#7a4a2b') {
+  const g = new THREE.Group(), c = M(color), dark = M('#2e1f15');
+  box(1.6, 0.7, 0.55, c, 0, 1.38, 0, g);
+  for (const lx of [-0.6, 0.6]) for (const lz of [-0.18, 0.18]) box(0.14, 1.05, 0.14, c, lx, 0.53, lz, g);
+  const tail = box(0.1, 0.7, 0.12, dark, -0.85, 1.2, 0, g); tail.rotation.z = -0.35;
+  const neck = new THREE.Group(); neck.position.set(0.7, 1.55, 0); g.add(neck);
+  const nk = box(0.3, 0.85, 0.3, c, 0.18, 0.32, 0, neck); nk.rotation.z = -0.5;
+  const mane = box(0.08, 0.8, 0.1, dark, 0.04, 0.38, 0, neck); mane.rotation.z = -0.5;
+  box(0.62, 0.28, 0.28, c, 0.52, 0.66, 0, neck);
+  for (const s of [-1, 1]) box(0.06, 0.16, 0.06, c, 0.32, 0.86, 0.08 * s, neck);
+  g.userData.neck = neck; g.userData.dip = 1.15; return g;
+}
+function makePig() {
+  const g = new THREE.Group(), pink = M('#eaa3a0'), dk = M('#c97a78');
+  const body = mesh(new THREE.CapsuleGeometry(0.32, 0.55, 4, 10), pink, 0, 0.55, 0, g); body.rotation.z = Math.PI / 2;
+  for (const lx of [-0.3, 0.3]) for (const lz of [-0.16, 0.16]) box(0.12, 0.3, 0.12, pink, lx, 0.15, lz, g);
+  const neck = new THREE.Group(); neck.position.set(0.5, 0.6, 0); g.add(neck);
+  box(0.36, 0.36, 0.4, pink, 0.14, 0, 0, neck);
+  const sn = cyl(0.11, 0.11, 0.08, dk, 0.35, -0.04, 0, neck, 12); sn.rotation.z = Math.PI / 2;
+  for (const s of [-1, 1]) { const e = box(0.04, 0.14, 0.12, dk, 0.08, 0.22, 0.13 * s, neck); e.rotation.x = 0.4 * s; }
+  g.userData.neck = neck; g.userData.dip = 0.55; return g;
+}
+const animals = [];
+function addAnimal(obj, pen, drinkX, speed) {
+  const p = PENS[pen];
+  obj.position.set(p.x0 + 2 + Math.random() * (p.x1 - p.x0 - 3), 0, p.z0 + 1.2 + Math.random() * (p.z1 - p.z0 - 2.4));
+  obj.rotation.y = Math.random() * 6.28;
+  obj.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  scene.add(obj);
+  tagClick(obj, { tank: pen });
+  animals.push({ obj, pen, drinkX, speed, state: 'idle', timer: Math.random() * 3, target: obj.position.clone(), dip: 0 });
+}
+addAnimal(makeCow(), 'vacas', 14.0, 0.8); addAnimal(makeCow(), 'vacas', 14.0, 0.8);
+addAnimal(makeHorse(), 'caballos', 14.1, 1.1); addAnimal(makeHorse('#3b2a20'), 'caballos', 14.1, 1.1);
+addAnimal(makePig(), 'cerdos', 13.45, 0.7); addAnimal(makePig(), 'cerdos', 13.45, 0.7); addAnimal(makePig(), 'cerdos', 13.45, 0.7);
+
+/* ---------- árboles y decoración ---------- */
+function tree(x, z, s = 1) {
+  cyl(0.16 * s, 0.22 * s, 1.6 * s, MAT.woodDark, x, 0.8 * s, z, scene, 8);
+  mesh(new THREE.IcosahedronGeometry(1.2 * s, 0), M('#4c8a3c'), x, 2.2 * s, z);
+  mesh(new THREE.IcosahedronGeometry(0.85 * s, 0), M('#5d9c45'), x + 0.3 * s, 3.0 * s, z - 0.2 * s);
+}
+[[-28, -18, 1.3], [-21, -23, 1.1], [-29, 15, 1.2], [23, -18, 1.2], [26, 6, 1.4], [25, 18, 1.1], [-3, 15, 1], [5, -15, 1.2], [-19, 17, 1.3], [-1, -22, 1.4], [-30, 0, 1.1], [30, -6, 1], [-6, 21, 1.2], [14, 20, 1.3], [13, -20, 1.1]].forEach(a => tree(...a));
+for (let i = 0; i < 14; i++) { const a = Math.random() * Math.PI * 2, r = 30 + Math.random() * 12; mesh(new THREE.DodecahedronGeometry(0.3 + Math.random() * 0.5, 0), MAT.stone, Math.cos(a) * r, 0.1, Math.sin(a) * r); }
+
+/* ---------- BOMBAS ---------- */
+const pumps = {};
+function makePump(id, x, z, parent = scene) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); parent.add(g);
+  box(0.5, 0.12, 0.5, MAT.concrete, 0, 0.06, 0, g);
+  const body = cyl(0.19, 0.19, 0.42, MAT.pumpBlue, 0, 0.33, 0, g, 16);
+  cyl(0.21, 0.21, 0.06, M('#1c3c58'), 0, 0.55, 0, g, 16);
+  const led = mesh(new THREE.SphereGeometry(0.06, 10, 10), ledMat(), 0, 0.63, 0, g, false);
+  pumps[id] = { group: g, body, led };
+  tagClick(g, { tank: ACTS[id].dst });
+}
+makePump('B1', -9.8, 6);
+pad(-3.9, 0.8, 3.6, 1.3, MAT.concrete, 0.03);
+makePump('B5', -5.2, 0.8); makePump('B4', -4.4, 0.8); makePump('B3', -3.6, 0.8); makePump('B2', -2.8, 0.8);
+
+/* ---------- TUBERÍAS ---------- */
+function roundedPath(pts, r = 0.3) {
+  const path = new THREE.CurvePath(); let prev = pts[0].clone();
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = pts[i - 1], b = pts[i], c = pts[i + 1];
+    const d1 = b.clone().sub(a), d2 = c.clone().sub(b);
+    const rr = Math.min(r, d1.length() / 2, d2.length() / 2);
+    const p1 = b.clone().sub(d1.normalize().multiplyScalar(rr));
+    const p2 = b.clone().add(d2.normalize().multiplyScalar(rr));
+    if (p1.distanceTo(prev) > 1e-4) path.add(new THREE.LineCurve3(prev, p1));
+    path.add(new THREE.QuadraticBezierCurve3(p1, b.clone(), p2));
+    prev = p2;
+  }
+  path.add(new THREE.LineCurve3(prev, pts[pts.length - 1].clone()));
+  return path;
+}
+function pipe(pts, radius = 0.085, mat = MAT.pvc) {
+  const curve = roundedPath(pts.map(p => V(...p)));
+  const len = curve.getLength();
+  const m = mesh(new THREE.TubeGeometry(curve, Math.max(24, Math.round(len * 6)), radius, 8, false), mat);
+  return { curve, len, mesh: m };
+}
+const PATHS = {
+  V0: [[-24, 1.15, 6], [-14.6, 1.15, 6], [-14.6, 0.2, 6]],
+  B1: [[-13.4, -3.9, 6], [-13.4, 1.28, 6], [-9.8, 1.28, 6], [-9.8, 0.42, 6], [-9.8, 0.42, -3], [-5.9, 0.42, -3], [-5.9, 8.45, -3], [-4.6, 8.45, -3], [-4.6, 7.9, -3]],
+  B2: [[-2.8, 0.2, 1.2], [-2.8, 0.2, 1.6], [8, 0.2, 1.6], [8, 0.2, -9.5], [11.6, 0.2, -9.5], [11.6, 1.0, -9.5], [12.3, 1.0, -9.5]],
+  B3: [[-3.6, 0.2, 1.2], [-3.6, 0.2, 2.0], [11.6, 0.2, 2.0], [11.6, 0.2, 0.5], [11.6, 1.12, 0.5], [12.3, 1.12, 0.5]],
+  B4: [[-4.4, 0.2, 1.2], [-4.4, 0.2, 2.4], [8.8, 0.2, 2.4], [8.8, 0.2, 10.5], [11.6, 0.2, 10.5], [11.6, 0.78, 10.5], [12.3, 0.78, 10.5]],
+  B5: [[-5.2, 0.2, 1.2], [-5.2, 0.2, 1.4], [-7.5, 0.2, 1.4], [-7.5, 0.2, -11.5], [-8.85, 0.2, -11.5], [-8.85, 5.7, -11.5], [-10.8, 5.7, -11.5], [-10.8, 5.7, -12.4], [-10.8, 5.0, -12.4]],
+};
+// succión común del tanque de reserva hacia las bombas B2–B5
+pipe([[-4, 4.7, -3], [-4, 0.32, -3], [-4, 0.32, 0.35]], 0.1, MAT.pvcDark);
+pipe([[-5.4, 0.32, 0.35], [-2.6, 0.32, 0.35]], 0.1, MAT.pvcDark);
+for (const x of [-5.2, -4.4, -3.6, -2.8]) pipe([[x, 0.32, 0.35], [x, 0.32, 0.62]], 0.06, MAT.pvcDark);
+
+const pipes = {};
+const sphereGeo = new THREE.SphereGeometry(0.075, 8, 6);
+function nearestT(curve, p) {
+  let best = 0, bd = Infinity; const tmp = new THREE.Vector3();
+  for (let i = 0; i <= 400; i++) { const t = i / 400; curve.getPointAt(t, tmp); const d = tmp.distanceToSquared(p); if (d < bd) { bd = d; best = t; } }
+  return best;
+}
+const dummy = new THREE.Object3D();
+for (const id of ACT_IDS) {
+  const p = pipe(PATHS[id]);
+  const N = Math.max(10, Math.round(p.len * 1.4));
+  const inst = new THREE.InstancedMesh(sphereGeo, MAT.waterBright, N);
+  inst.frustumCulled = false; inst.visible = false; scene.add(inst);
+  const breakT = {};
+  for (const k of ACTS[id].breaks) breakT[k] = nearestT(p.curve, BREAKS[k].pos);
+  pipes[id] = { ...p, inst, N, phase: Math.random(), breakT };
+  p.mesh.traverse(o => o.userData = { tank: ACTS[id].dst }); clickables.push(p.mesh);
+}
+
+/* ---------- fugas: chorro, charco y marca ---------- */
+const leakFx = {};
+for (const k in BREAKS) {
+  const b = BREAKS[k];
+  const marker = mesh(new THREE.SphereGeometry(0.17, 12, 10), new THREE.MeshStandardMaterial({ color: '#f0604f', emissive: '#f0604f', emissiveIntensity: 0.8 }), b.pos.x, b.pos.y, b.pos.z, scene, false);
+  const halo = mesh(new THREE.RingGeometry(0.45, 0.6, 32), new THREE.MeshBasicMaterial({ color: '#f0604f', transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }), b.pos.x, 0.05, b.pos.z, scene, false);
+  halo.rotation.x = -Math.PI / 2;
+  const puddle = mesh(new THREE.CircleGeometry(1, 32), new THREE.MeshStandardMaterial({ color: '#3d86b8', transparent: true, opacity: 0.75, roughness: 0.1, depthWrite: false }), b.pos.x, 0.03, b.pos.z, scene, false);
+  puddle.rotation.x = -Math.PI / 2; puddle.visible = false;
+  marker.visible = halo.visible = false;
+  leakFx[k] = { marker, halo, puddle, emitters: [] };
+}
+// un emisor de chorro por cada tubería que pasa por el punto roto
+for (const id of ACT_IDS) for (const k of ACTS[id].breaks) {
+  const pos = pipes[id].curve.getPointAt(pipes[id].breakT[k]);
+  const n = 70, geo = new THREE.BufferGeometry();
+  const arr = new Float32Array(n * 3); geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#6cc4f5', size: 0.13, transparent: true, opacity: 0.9, depthWrite: false }));
+  pts.frustumCulled = false; pts.visible = false; scene.add(pts);
+  const parts = Array.from({ length: n }, () => ({ p: pos.clone(), v: V(0, 0, 0), life: Math.random() }));
+  leakFx[k].emitters.push({ act: id, pos, pts, arr, parts });
+}
+
+/* ---------- GABINETE DE CONTROL (ESP32 + relés + MB102) ---------- */
+const cab = { relayLeds: {} };
+{
+  const g = new THREE.Group(); g.position.set(5, 0, 7.5); scene.add(g);
+  box(0.16, 1.7, 0.16, MAT.metal, 0, 0.85, -0.12, g);
+  box(1.5, 1.5, 0.45, M('#c9ced1', { metalness: 0.3, roughness: 0.5 }), 0, 2.2, 0, g);
+  box(1.36, 1.36, 0.02, M('#e9ecec'), 0, 2.2, 0.215, g);
+  const door = new THREE.Group(); door.position.set(-0.75, 2.2, 0.23); g.add(door);
+  box(1.5, 1.5, 0.04, M('#c9ced1', { metalness: 0.3, roughness: 0.5 }), 0.75, 0, 0, door);
+  door.rotation.y = -2.0;
+  // protoboard + MB102
+  box(1.15, 0.55, 0.04, M('#f4f4ef'), 0, 1.78, 0.24, g);
+  box(0.32, 0.2, 0.05, M('#b0312b'), -0.38, 1.6, 0.27, g);
+  // ESP32
+  box(0.28, 0.5, 0.04, M('#1f2326'), 0.05, 1.8, 0.27, g);
+  box(0.18, 0.22, 0.03, MAT.silver, 0.05, 1.93, 0.3, g);
+  cab.espLed = mesh(new THREE.SphereGeometry(0.025, 8, 8), ledMat(), 0.13, 1.6, 0.3, g, false);
+  // 3 módulos de relé (2 canales c/u)
+  const pairs = [['V0', 'B1'], ['B2', 'B3'], ['B4', 'B5']];
+  pairs.forEach((pr, i) => {
+    const x = -0.42 + i * 0.42;
+    box(0.36, 0.4, 0.04, M('#20599a'), x, 2.55, 0.24, g);
+    pr.forEach((aid, j) => {
+      box(0.13, 0.15, 0.1, M('#2d78c8'), x - 0.08 + j * 0.16, 2.6, 0.29, g);
+      cab.relayLeds[aid] = mesh(new THREE.SphereGeometry(0.025, 8, 8), ledMat(), x - 0.08 + j * 0.16, 2.42, 0.29, g, false);
+    });
+  });
+  // antena WiFi
+  cyl(0.03, 0.03, 1.4, MAT.metal, 0.55, 3.65, 0, g, 8);
+  cab.antLed = mesh(new THREE.SphereGeometry(0.07, 10, 10), ledMat(), 0.55, 4.38, 0, g, false);
+  cab.antPos = V(5.55, 4.38, 7.5);
+  cab.boxPos = V(5, 2.3, 7.5);
+  tagClick(g, { cabinet: true });
+}
+
+/* ---------- efectos de sensores y comunicación ---------- */
+const pingRings = [];
+const pingMat = c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false });
+for (const id of TANK_IDS) {
+  const ring = mesh(new THREE.RingGeometry(0.1, 0.15, 32), pingMat('#7fe0ff'), 0, 0, 0, scene, false);
+  ring.rotation.x = -Math.PI / 2;
+  const sp = new THREE.Vector3(); vis[id].sensor.group.updateWorldMatrix(true, false); vis[id].sensor.group.getWorldPosition(sp);
+  pingRings.push({ id, ring, phase: Math.random(), sp });
+  vis[id].setThresholds(cfg.low, cfg.high);
+}
+// enlaces de datos sensor → ESP32 (arcos punteados)
+const links = [];
+for (const r of pingRings) {
+  const a = r.sp.clone().add(V(0, 0.15, 0)), b = cab.boxPos.clone();
+  const mid = a.clone().lerp(b, 0.5); mid.y = Math.max(a.y, b.y) + 3 + a.distanceTo(b) * 0.12;
+  const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+  const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(40));
+  const line = new THREE.Line(geo, new THREE.LineDashedMaterial({ color: '#2a7fb0', dashSize: 0.35, gapSize: 0.25, transparent: true, opacity: 0.45 }));
+  line.computeLineDistances(); scene.add(line);
+  const dot = mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshBasicMaterial({ color: '#8ff0ff' }), 0, -50, 0, scene, false);
+  links.push({ id: r.id, curve, dot, t: -1 });
+}
+const packets = [];
+const fx = {
+  sensorPulse() { links.forEach((l, i) => { if (!TANKS[l.id].sensorFail) l.t = -i * 0.06; }); },
+  packet(ok) {
+    const ring = mesh(new THREE.TorusGeometry(0.3, 0.035, 6, 32), new THREE.MeshBasicMaterial({ color: ok ? '#7fe0ff' : '#f0604f', transparent: true, opacity: 0.9 }), cab.antPos.x, cab.antPos.y, cab.antPos.z, scene, false);
+    ring.rotation.x = Math.PI / 2;
+    const cube = mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshBasicMaterial({ color: ok ? '#bff3ff' : '#f0604f', transparent: true }), cab.antPos.x, cab.antPos.y, cab.antPos.z, scene, false);
+    packets.push({ ring, cube, t: 0, ok });
+  },
+};
+
+/* =====================================================================
+   5. ETIQUETAS 3D (HTML)
+   ===================================================================== */
+const labelsEl = $('#labels');
+const labels = [];
+function addLabel(anchor, cls, onClick) {
+  const el = document.createElement('div'); el.className = 'tag ' + cls; labelsEl.appendChild(el);
+  if (onClick) el.addEventListener('click', onClick);
+  const l = { el, anchor }; labels.push(l); return l;
+}
+for (const id of TANK_IDS) vis[id].label = addLabel(vis[id].anchor, '', () => selectTank(id));
+const miniLabels = [
+  { anchor: V(-24, 2.0, 6), html: () => `<b>Red de agua</b>V0 ${ACTS.V0.locked ? 'bloqueada' : ACTS.V0.on ? 'abierta' : 'cerrada'}`, tank: 'pozo' },
+  { anchor: V(-9.8, 1.3, 6), html: () => `<b>B1</b>${ACTS.B1.locked ? 'bloqueada' : ACTS.B1.on ? 'encendida' : 'apagada'}`, tank: 'reserva' },
+  { anchor: V(-4, 1.4, 1.1), html: () => `<b>Bombas</b>B5 · B4 · B3 · B2`, tank: null },
+  { anchor: V(5, 4.9, 7.5), html: () => `<b>ESP32</b>${cfg.wifi ? 'enviando por WiFi' : 'sin WiFi'}`, cabinet: true },
+];
+miniLabels.forEach(m => { m.l = addLabel(m.anchor, 'mini', () => m.cabinet ? showView('hardware') : m.tank && selectTank(m.tank)); });
+const _v = new THREE.Vector3();
+function placeLabels() {
+  const w = window.innerWidth, h = window.innerHeight;
+  for (const l of labels) {
+    _v.copy(l.anchor).project(camera);
+    const vis_ = _v.z < 1 && Math.abs(_v.x) < 1.2 && Math.abs(_v.y) < 1.2;
+    l.el.style.display = vis_ ? '' : 'none';
+    if (vis_) l.el.style.transform = `translate(${((_v.x + 1) / 2 * w).toFixed(1)}px,${((1 - _v.y) / 2 * h).toFixed(1)}px) translate(-50%,calc(-100% - 6px))`;
+  }
+}
+function updateLabelContent() {
+  for (const id of TANK_IDS) {
+    const t = TANKS[id], a = ACTS[t.filler], st = stateOf(t.reading);
+    const pump = a.locked ? `<span class="chip lock">${a.id} BLOQUEADA</span>` : a.on ? `<span class="chip on">${a.id} LLENANDO</span>` : '';
+    vis[id].label.el.className = 'tag' + ((st.k === 'bajo' || st.k === 'vacio' || st.k === 'err' || a.locked) ? ' alarm' : '');
+    vis[id].label.el.innerHTML = `<b>${t.name}</b><span class="p">${t.reading === null ? '--' : pct(t.reading)}</span><span class="chip ${st.k}">${st.t}</span><div class="s"><span class="muted mono">${t.reading === null ? 'sin lectura' : nf.format(t.reading * t.cap) + ' L · ' + distCm(t).toFixed(1) + ' cm'}</span>${pump}</div>`;
+  }
+  miniLabels.forEach(m => m.l.el.innerHTML = m.html());
+}
+
+/* =====================================================================
+   6. ACTUALIZACIÓN VISUAL
+   ===================================================================== */
+const tmpV = new THREE.Vector3();
+function setLed(m, color, on) { m.material.color.set(on ? color : '#26343b'); m.material.emissive.set(on ? color : '#000000'); }
+function updateVisuals(dt, now) {
+  const tS = now / 1000;
+  for (const id of TANK_IDS) vis[id].setLevel(level(TANKS[id]));
+
+  // ondas ultrasónicas del HC-SR04
+  for (const r of pingRings) {
+    const t = TANKS[r.id];
+    if (t.sensorFail) { r.ring.visible = false; setLed(vis[r.id].sensor.led, '#f0604f', Math.sin(tS * 8) > 0); continue; }
+    setLed(vis[r.id].sensor.led, '#4fc58e', true);
+    r.phase = (r.phase + dt * 0.9) % 1;
+    const sy = r.sp.y - 0.05, wy = vis[r.id].surfaceY(level(t));
+    r.ring.visible = !reduceMotion;
+    r.ring.position.set(r.sp.x, sy + (wy - sy) * r.phase + 0.02, r.sp.z);
+    const sc = 1 + r.phase * 3; r.ring.scale.set(sc, sc, sc);
+    r.ring.material.opacity = 0.85 * (1 - r.phase);
+  }
+  // bombas, válvula y relés
+  for (const id of ACT_IDS) {
+    const a = ACTS[id];
+    const color = a.locked ? '#f0604f' : '#4fc58e';
+    const lit = a.locked ? Math.sin(tS * 6) > 0 : a.on;
+    if (pumps[id]) {
+      setLed(pumps[id].led, color, lit);
+      pumps[id].body.position.x = a.on ? Math.sin(tS * 90) * 0.012 : 0;
+    }
+    setLed(cab.relayLeds[id], a.locked ? '#f0604f' : '#ff5a3c', a.on || (a.locked && lit));
+  }
+  setLed(valve.led, ACTS.V0.locked ? '#f0604f' : '#4fc58e', ACTS.V0.locked ? Math.sin(tS * 6) > 0 : ACTS.V0.on);
+  if (ACTS.V0.on) valve.wheel.rotation.z += dt * 3;
+  setLed(cab.espLed, '#4ab6e6', Math.sin(tS * 4) > -0.2);
+  setLed(cab.antLed, cfg.wifi ? '#4fc58e' : '#f0604f', cfg.wifi || Math.sin(tS * 6) > 0);
+
+  // agua moviéndose por las tuberías
+  for (const id of ACT_IDS) {
+    const a = ACTS[id], p = pipes[id];
+    p.inst.visible = a.on;
+    if (!a.on) continue;
+    const bk = brokenKey(a);
+    const tEnd = bk ? p.breakT[bk] : 1;
+    p.phase = (p.phase + dt * 2.2 / p.len) % 1;
+    for (let i = 0; i < p.N; i++) {
+      let t = ((i / p.N) + p.phase) % 1;
+      if (t > tEnd) { dummy.scale.setScalar(0.0001); }
+      else { p.curve.getPointAt(t, tmpV); dummy.position.copy(tmpV); dummy.scale.setScalar(1); }
+      dummy.updateMatrix(); p.inst.setMatrixAt(i, dummy.matrix);
+    }
+    p.inst.instanceMatrix.needsUpdate = true;
+  }
+  // fugas
+  for (const k in BREAKS) {
+    const b = BREAKS[k], f = leakFx[k];
+    f.marker.visible = f.halo.visible = b.broken;
+    if (b.broken) { const s = 1 + Math.sin(tS * 6) * 0.25; f.marker.scale.setScalar(s); f.halo.scale.setScalar(1 + (tS % 1) * 0.8); f.halo.material.opacity = 0.6 * (1 - (tS % 1)); }
+    if (!b.broken) b.leaked *= Math.exp(-dt * 0.25);
+    f.puddle.visible = b.leaked > 2;
+    f.puddle.scale.setScalar(Math.min(3.2, 0.35 + Math.sqrt(b.leaked) / 8));
+    for (const e of f.emitters) {
+      const a = ACTS[e.act];
+      const active = b.broken && a.on && brokenKey(a) === k;
+      e.pts.visible = active || e.parts.some(q => q.life < 1);
+      if (!e.pts.visible) continue;
+      e.parts.forEach((q, i) => {
+        q.life += dt * 1.4;
+        if (q.life >= 1 && active) { q.life = Math.random() * 0.2; q.p.copy(e.pos); q.v.set((Math.random() - 0.5) * 2.2, 2.5 + Math.random() * 2.2, (Math.random() - 0.5) * 2.2); }
+        if (q.life < 1) { q.v.y -= 9 * dt; q.p.addScaledVector(q.v, dt); if (q.p.y < 0.03) { q.p.y = 0.03; q.v.set(0, 0, 0); } }
+        else q.p.set(0, -50, 0);
+        e.arr[i * 3] = q.p.x; e.arr[i * 3 + 1] = q.p.y; e.arr[i * 3 + 2] = q.p.z;
+      });
+      e.pts.geometry.attributes.position.needsUpdate = true;
+    }
+  }
+  // datos viajando de los sensores al ESP32
+  for (const l of links) {
+    if (l.t < -0.5 || l.t > 1) { l.dot.position.y = -50; continue; }
+    l.t += dt * 1.3;
+    if (l.t >= 0 && l.t <= 1) l.curve.getPoint(l.t, l.dot.position); else l.dot.position.y = -50;
+  }
+  // paquetes WiFi saliendo de la antena
+  for (let i = packets.length - 1; i >= 0; i--) {
+    const p = packets[i]; p.t += dt;
+    const s = 1 + p.t * 5; p.ring.scale.set(s, s, s); p.ring.material.opacity = Math.max(0, 0.9 - p.t * 0.9);
+    if (p.ok) { p.cube.position.y = cab.antPos.y + p.t * 6; p.cube.rotation.y += dt * 4; p.cube.material.opacity = Math.max(0, 1 - p.t); }
+    else { p.cube.position.y = cab.antPos.y + Math.min(p.t, 0.3) * 3; p.cube.material.opacity = Math.max(0, 1 - p.t * 1.5); }
+    if (p.t > 1.1) { scene.remove(p.ring, p.cube); p.ring.geometry.dispose(); p.cube.geometry.dispose(); packets.splice(i, 1); }
+  }
+  // animales
+  for (const an of animals) {
+    const p = PENS[an.pen], t = TANKS[an.pen], o = an.obj;
+    const hasWater = level(t) > 0.04;
+    an.timer -= dt;
+    if (an.state === 'walk' || an.state === 'goDrink') {
+      const dx = an.target.x - o.position.x, dz = an.target.z - o.position.z, dist = Math.hypot(dx, dz);
+      if (dist < 0.08) {
+        if (an.state === 'goDrink') { an.state = 'drink'; an.timer = 3 + Math.random() * 4; }
+        else { an.state = 'idle'; an.timer = 1 + Math.random() * 3; }
+      } else {
+        const step = Math.min(dist, an.speed * dt);
+        o.position.x += dx / dist * step; o.position.z += dz / dist * step;
+        const want = Math.atan2(-dz, dx); let d = want - o.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
+        o.rotation.y += d * Math.min(1, dt * 5);
+        o.position.y = Math.abs(Math.sin(tS * 7 * an.speed)) * 0.03;
+      }
+    } else if (an.state === 'drink') {
+      let d = Math.PI - o.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.rotation.y += d * Math.min(1, dt * 4);
+      if (an.timer <= 0 || !hasWater) { an.state = 'idle'; an.timer = 1 + Math.random() * 2; }
+    } else if (an.timer <= 0) {
+      const goDrink = Math.random() < (hasWater ? 0.45 : 0.25);
+      const tr = PENS[an.pen].trough;
+      if (goDrink) { an.state = 'goDrink'; an.target.set(an.drinkX, 0, (p.z0 + p.z1) / 2 + (Math.random() - 0.5) * (tr.len - 0.6)); }
+      else { an.state = 'walk'; an.target.set(p.x0 + 2.2 + Math.random() * (p.x1 - p.x0 - 3.2), 0, p.z0 + 1.2 + Math.random() * (p.z1 - p.z0 - 2.4)); }
+    }
+    const wantDip = an.state === 'drink' && hasWater ? 1 : 0;
+    an.dip += (wantDip - an.dip) * Math.min(1, dt * 3);
+    o.userData.neck.rotation.z = -o.userData.dip * an.dip + (an.state === 'drink' && !hasWater ? 0.15 : 0);
+  }
+}
+
+/* =====================================================================
+   7. INTERFAZ (panel tipo app)
+   ===================================================================== */
+let currentView = 'monitor';
+function showView(v) {
+  currentView = v;
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === v)));
+  document.querySelectorAll('.view').forEach(s => s.hidden = s.id !== 'view-' + v);
+  if (v === 'alertas') { unread = 0; renderLog(); }
+  openPanel(true);
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showView(t.dataset.view)));
+$('#openAlerts').addEventListener('click', () => showView('alertas'));
+$('#clearLog').addEventListener('click', () => { logEntries.length = 0; renderLog(); });
+function openPanel(open) {
+  const p = $('#panel'); p.classList.toggle('collapsed', !open); $('#panelToggle').setAttribute('aria-expanded', String(open));
+}
+$('#panelToggle').addEventListener('click', () => openPanel($('#panel').classList.contains('collapsed')));
+$('#panel .tabs').addEventListener('dblclick', () => openPanel($('#panel').classList.contains('collapsed')));
+
+// lista de la app
+const appRows = {};
+$('#appList').innerHTML = TANK_IDS.map(id => `<li class="trow" data-id="${id}" tabindex="0">
+  <div class="trow-head"><b>${TANKS[id].name}</b><span class="chip"></span></div>
+  <div class="bar"><i></i><span class="mark low"></span><span class="mark high"></span></div>
+  <div class="trow-meta"><span class="pct"></span><span class="lit"></span><span class="cm"></span><span class="pmp"></span></div></li>`).join('');
+document.querySelectorAll('#appList .trow').forEach(li => {
+  const id = li.dataset.id;
+  appRows[id] = { li, chip: li.querySelector('.chip'), bar: li.querySelector('.bar i'), low: li.querySelector('.mark.low'), high: li.querySelector('.mark.high'), pct: li.querySelector('.pct'), lit: li.querySelector('.lit'), cm: li.querySelector('.cm'), pmp: li.querySelector('.pmp') };
+  li.addEventListener('click', () => selectTank(id, false));
+  li.addEventListener('keydown', e => { if (e.key === 'Enter') selectTank(id, false); });
+});
+
+// tarjetas de control
+const useBtn = {
+  pozo: [['Extraer 30 %', 0.3, 'Se extrajo agua del pozo.']],
+  reserva: [['Gastar 30 %', 0.3, 'Se usó agua de la reserva.']],
+  casa: [['Abrir la ducha (−25 %)', 0.25, 'Alguien se bañó.']],
+  vacas: [['Las vacas beben (−30 %)', 0.3, 'Las vacas bebieron.'], ['Vaciar', 1, 'Se vació el bebedero para lavarlo.']],
+  caballos: [['Los caballos beben (−30 %)', 0.3, 'Los caballos bebieron.'], ['Vaciar', 1, 'Se vació el bebedero para lavarlo.']],
+  cerdos: [['Los cerdos beben (−30 %)', 0.3, 'Los cerdos bebieron.'], ['Vaciar', 1, 'Los cerdos voltearon el bebedero.']],
+};
+const ctl = {};
+$('#ctlCards').innerHTML = TANK_IDS.map(id => {
+  const a = ACTS[TANKS[id].filler];
+  return `<div class="card" id="ctl-${id}">
+    <div class="ctl-head"><h3>${TANKS[id].name}</h3><div class="row"><span class="chip"></span><span class="num"></span></div></div>
+    <div class="bar"><i></i><span class="mark low"></span><span class="mark high"></span></div>
+    <div class="ctl-pump"><span class="led"></span><span class="pinfo"></span></div>
+    <div class="ctl-btns">
+      <button class="btn primary small" data-act="fill">${a.type === 'valve' ? 'Abrir llave' : 'Llenar'}</button>
+      <button class="btn small" data-act="stop">${a.type === 'valve' ? 'Cerrar' : 'Detener'}</button>
+      ${useBtn[id].map((u, i) => `<button class="btn small" data-act="use" data-i="${i}">${u[0]}</button>`).join('')}
+    </div></div>`;
+}).join('');
+TANK_IDS.forEach(id => {
+  const c = $('#ctl-' + id);
+  ctl[id] = { c, chip: c.querySelector('.chip'), num: c.querySelector('.num'), bar: c.querySelector('.bar i'), low: c.querySelector('.mark.low'), high: c.querySelector('.mark.high'), led: c.querySelector('.led'), pinfo: c.querySelector('.pinfo'), fill: c.querySelector('[data-act=fill]'), stop: c.querySelector('[data-act=stop]') };
+  c.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.act === 'fill') requestFill(id);
+    if (b.dataset.act === 'stop') requestStop(id);
+    if (b.dataset.act === 'use') { const u = useBtn[id][+b.dataset.i]; useWater(id, u[1], u[2]); }
+    refreshUI();
+  });
+});
+
+// lista de tuberías y sensores
+$('#pipeList').innerHTML = Object.values(BREAKS).map(b => `<div class="fitem"><div class="lbl">${b.name}<small id="leak-${b.key}">${b.note || 'sin fugas'}</small></div><label class="switch bad" title="Romper tubería"><input type="checkbox" data-break="${b.key}" aria-label="Romper ${b.name}"><span class="track"></span></label></div>`).join('');
+$('#pipeList').addEventListener('change', e => {
+  const k = e.target.dataset.break; if (!k) return;
+  setBreak(k, e.target.checked);
+});
+function setBreak(k, on) {
+  BREAKS[k].broken = on;
+  const cb = document.querySelector(`[data-break="${k}"]`); if (cb) cb.checked = on;
+  if (on) log('info', `Simulación: se dañó la tubería "${BREAKS[k].name}". El ESP32 no lo sabe todavía; lo notará si una bomba no logra subir el nivel.`, { local: true, every: 0 });
+  else log('ok', `Tubería "${BREAKS[k].name}" reparada.`, { local: true, every: 0 });
+}
+$('#sensorList').innerHTML = TANK_IDS.map(id => `<div class="fitem"><div class="lbl">${TANKS[id].name}<small>TRIG ${TANKS[id].trig} · ECHO ${TANKS[id].echo}</small></div><label class="switch bad" title="Desconectar sensor"><input type="checkbox" data-sensor="${id}" aria-label="Desconectar sensor de ${TANKS[id].name}"><span class="track"></span></label></div>`).join('');
+$('#sensorList').addEventListener('change', e => {
+  const id = e.target.dataset.sensor; if (!id) return;
+  TANKS[id].sensorFail = e.target.checked;
+});
+$('#wifiFault').addEventListener('change', e => {
+  cfg.wifi = !e.target.checked;
+  if (!cfg.wifi) log('warn', 'Se perdió la conexión WiFi del ESP32. El control automático sigue funcionando en el ESP32, pero la app ya no recibe datos.', { every: 0, local: true });
+});
+$('#droughtFault').addEventListener('change', e => {
+  cfg.drought = e.target.checked;
+  log(cfg.drought ? 'warn' : 'ok', cfg.drought ? 'Simulación: sequía. El pozo ya no se recarga solo; dependerá de la llave de la red (V0).' : 'Fin de la sequía: el pozo vuelve a recargarse.', { every: 0, local: true });
+});
+$('#lockList').addEventListener('click', e => {
+  const id = e.target.dataset.rearm; if (!id) return;
+  rearm(id);
+});
+function rearm(id) {
+  const a = ACTS[id]; a.locked = false; a.waitLogged = false;
+  const still = brokenKey(a);
+  log(still ? 'warn' : 'ok', still ? `${id} rearmada, pero la tubería "${BREAKS[still].name}" sigue rota: la falla se volverá a detectar.` : `${id} rearmada. El ESP32 puede volver a encenderla.`, { local: true, every: 0 });
+  refreshUI();
+}
+$('#scenarioBtn').addEventListener('click', () => {
+  setBreak('troncal', true);
+  if (TANKS.reserva.L < TANKS.reserva.cap * 0.5) TANKS.reserva.L = TANKS.reserva.cap * 0.7;
+  for (const id of ['vacas', 'caballos', 'cerdos']) {
+    const t = TANKS[id]; if (level(t) > 0.35) t.L = t.cap * (0.2 + Math.random() * 0.1);
+    const a = ACTS[t.filler]; a.locked = false; a.holdUntil = -1;
+    readSensors();
+    if (!a.on) startAct(a, 'manual');
+  }
+  log('info', `Escenario iniciado: B2, B3 y B4 encendidas con el tramo principal roto. Detección en ${cfg.win} min de simulación.`, { local: true, every: 0 });
+  focusOn(V(4, 0.5, 1), 22);
+  refreshUI();
+});
+$('#repairAll').addEventListener('click', () => {
+  for (const k in BREAKS) if (BREAKS[k].broken) setBreak(k, false);
+  for (const id of ACT_IDS) ACTS[id].locked = false;
+  TANK_IDS.forEach(id => { TANKS[id].sensorFail = false; });
+  document.querySelectorAll('[data-sensor]').forEach(c => c.checked = false);
+  if (!cfg.wifi) { cfg.wifi = true; $('#wifiFault').checked = false; }
+  if (cfg.drought) { cfg.drought = false; $('#droughtFault').checked = false; }
+  log('ok', 'Todo reparado: tuberías, sensores y WiFi. Bombas rearmadas.', { local: true, every: 0 });
+  refreshUI();
+});
+
+// configuración
+function setAuto(v) {
+  cfg.auto = v; $('#autoTop').checked = v; $('#autoPanel').checked = v;
+  if (v) ACT_IDS.forEach(id => ACTS[id].holdUntil = -1);
+  log('info', v ? 'Modo automático activado: el ESP32 controla las bombas.' : 'Modo manual: las bombas solo se encienden con los botones (y se apagan solas al llenarse).', { local: true, every: 0 });
+}
+$('#autoTop').addEventListener('change', e => setAuto(e.target.checked));
+$('#autoPanel').addEventListener('change', e => setAuto(e.target.checked));
+$('#lowR').addEventListener('input', e => { cfg.low = +e.target.value / 100; $('#lowOut').textContent = e.target.value + '%'; TANK_IDS.forEach(id => vis[id].setThresholds(cfg.low, cfg.high)); refreshUI(); });
+$('#highR').addEventListener('input', e => { cfg.high = +e.target.value / 100; $('#highOut').textContent = e.target.value + '%'; TANK_IDS.forEach(id => vis[id].setThresholds(cfg.low, cfg.high)); refreshUI(); });
+$('#winR').addEventListener('input', e => { cfg.win = +e.target.value; $('#winOut').textContent = e.target.value + ' min'; });
+$('#speedSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  cfg.speed = +b.dataset.speed;
+  $('#speedSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+});
+$('#voiceBtn').addEventListener('click', () => {
+  cfg.voice = !cfg.voice;
+  $('#voiceBtn').setAttribute('aria-pressed', String(cfg.voice));
+  $('#voiceBtn span').textContent = cfg.voice ? 'Voz activa' : 'Voz apagada';
+  if (cfg.voice) { if (!('speechSynthesis' in window)) { toast('Este navegador no tiene síntesis de voz.'); return; } speak('Asistente de voz activado. Te avisaré si algo falla.'); }
+  else if ('speechSynthesis' in window) speechSynthesis.cancel();
+});
+$('#camBtn').addEventListener('click', () => { flyTo(HOME.pos, HOME.target); clearSel(); });
+
+// tabla de pines
+$('#pinTable').innerHTML = TANK_IDS.map(id => { const t = TANKS[id], a = ACTS[t.filler]; return `<tr><td>${t.name.replace('Bebedero de ', 'Beb. ').replace('Tanque de ', 'T. ')}</td><td class="mono">GPIO ${t.trig}</td><td class="mono">GPIO ${t.echo}</td><td class="mono">${a.id}</td><td class="mono">${a.relay} · G${a.pin}</td><td><span class="led" id="pinled-${a.id}"></span></td></tr>`; }).join('');
+
+function fillBar(o, r) { o.bar.style.width = (r === null ? 0 : r * 100) + '%'; o.low.style.left = (cfg.low * 100) + '%'; o.high.style.left = (cfg.high * 100) + '%'; }
+function actText(a) {
+  if (a.locked) return `${a.id} bloqueada por posible fuga`;
+  if (a.on) return `${a.id} ${a.type === 'valve' ? 'abierta' : 'encendida'} (${a.mode === 'auto' ? 'auto' : 'manual'}) · ${(simMin - a.since).toFixed(1)} min · ${a.flow} L/min`;
+  if (a.src && !srcOk(a, 0.02)) return `${a.id} en espera: falta agua en la fuente`;
+  return `${a.id} ${a.type === 'valve' ? 'cerrada' : 'apagada'}`;
+}
+function refreshUI() {
+  const now = performance.now();
+  $('#clock').textContent = clockStr(simMin);
+  // conexión
+  const age = (now - tele.lastRx) / 1000;
+  const online = cfg.wifi;
+  $('#connDot').classList.toggle('bad', !online);
+  $('#connTitle').textContent = online ? 'ESP32 conectado' : 'ESP32 sin conexión';
+  $('#connRssi').textContent = online ? `${tele.rssi} dBm` : 'sin señal';
+  $('#kvLast').textContent = age < 1.5 ? 'ahora' : `hace ${Math.round(age)} s`;
+  $('#kvSent').textContent = nf.format(tele.sent);
+  $('#kvFail').textContent = `${tele.failed} · ${tele.queued}`;
+  const stale = age > 5;
+  $('#staleBanner').hidden = !stale;
+  if (stale) $('#staleBanner').textContent = `Sin datos desde hace ${Math.round(age)} s. La app muestra la última lectura recibida; revisa el WiFi del ESP32.`;
+  // lista de la app (con datos recibidos)
+  const d = appData || snapshot();
+  for (const id of TANK_IDS) {
+    const row = appRows[id], td = d.tanques[id];
+    const r = td.nivel_pct === null ? null : td.nivel_pct / 100;
+    const st = stateOf(r);
+    row.chip.className = 'chip ' + st.k; row.chip.textContent = st.t;
+    fillBar(row, r);
+    row.pct.textContent = r === null ? '--' : td.nivel_pct + '%';
+    row.lit.textContent = r === null ? '' : nf.format(td.litros) + ' L';
+    row.cm.textContent = td.distancia_cm === null ? 'HC-SR04 sin eco' : `HC-SR04 ${td.distancia_cm.toFixed(1)} cm`;
+    const aid = TANKS[id].filler, as = d.actuadores[aid];
+    row.pmp.textContent = `${aid} ${as}`;
+    row.li.classList.toggle('stale', stale);
+  }
+  // control (estado real del ESP32)
+  for (const id of TANK_IDS) {
+    const t = TANKS[id], a = ACTS[t.filler], o = ctl[id], st = stateOf(t.reading);
+    o.chip.className = 'chip ' + st.k; o.chip.textContent = st.t;
+    o.num.textContent = t.reading === null ? '--' : pct(t.reading);
+    o.num.className = 'num';
+    fillBar(o, t.reading);
+    o.led.className = 'led' + (a.locked ? ' lock' : a.on ? ' on' : '');
+    o.pinfo.textContent = actText(a);
+    o.fill.disabled = a.on || a.locked;
+    o.stop.disabled = !a.on;
+  }
+  // fugas acumuladas
+  for (const k in BREAKS) {
+    const b = BREAKS[k], el = $('#leak-' + k);
+    el.textContent = b.broken ? (b.leaked > 1 ? `ROTA · ${nf.format(b.leaked)} L perdidos` : 'ROTA') : (b.note || 'sin fugas');
+    el.style.color = b.broken ? 'var(--crit)' : '';
+  }
+  const locked = ACT_IDS.filter(k => ACTS[k].locked);
+  $('#lockList').innerHTML = locked.length ? locked.map(k => `<div class="fitem"><div class="lbl">${k} · ${ACTS[k].name}<small>bloqueada a las ${clockStr(ACTS[k].faultAt, false)}</small></div><button class="btn small" data-rearm="${k}">Rearmar</button></div>`).join('')
+    : '<div class="fitem"><div class="lbl muted">Ninguna bomba bloqueada.</div></div>';
+  for (const id of ACT_IDS) { const l = $('#pinled-' + id); if (l) l.className = 'led' + (ACTS[id].locked ? ' lock' : ACTS[id].on ? ' on' : ''); }
+  updateLabelContent();
+}
+
+/* ---------- selección y cámara ---------- */
+let fly = null;
+function flyTo(pos, target) {
+  if (reduceMotion) { camera.position.copy(pos); controls.target.copy(target); return; }
+  fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos.clone(), t1: target.clone(), k: 0 };
+}
+function focusOn(target, dist = 13) {
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  if (dir.y < 0.35) { dir.y = 0.35; dir.normalize(); }
+  flyTo(target.clone().addScaledVector(dir, dist), target);
+}
+function clearSel() { document.querySelectorAll('#ctlCards .card.sel').forEach(c => c.classList.remove('sel')); }
+function selectTank(id, toControl = true) {
+  const dist = id === 'pozo' ? 15 : id === 'reserva' ? 15 : 11;
+  if (vis[id].view) flyTo(vis[id].focus.clone().addScaledVector(vis[id].view.clone().normalize(), dist), vis[id].focus);
+  else focusOn(vis[id].focus, dist);
+  clearSel(); ctl[id].c.classList.add('sel');
+  if (toControl) { showView('control'); ctl[id].c.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' }); }
+}
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+let downAt = null;
+canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+  const hit = pick(e);
+  if (hit?.tank) selectTank(hit.tank);
+  else if (hit?.cabinet) { focusOn(cab.boxPos, 6); showView('hardware'); }
+});
+let hoverT = 0;
+canvas.addEventListener('pointermove', e => {
+  if (e.buttons || performance.now() - hoverT < 80) return; hoverT = performance.now();
+  canvas.style.cursor = pick(e) ? 'pointer' : '';
+});
+function pick(e) {
+  const r = canvas.getBoundingClientRect();
+  ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ptr, camera);
+  const h = ray.intersectObjects(clickables, false)[0];
+  return h ? h.object.userData : null;
+}
+
+/* =====================================================================
+   8. BUCLE PRINCIPAL
+   ===================================================================== */
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  document.documentElement.style.setProperty('--topbar-h', $('#topbar').offsetHeight + 'px');
+  if (w <= 760) camera.fov = 55; else camera.fov = 45; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+if (window.innerWidth <= 760) { HOME.pos.set(20, 42, 52); HOME.target.set(-2, 0, 1); camera.position.copy(HOME.pos); controls.target.copy(HOME.target); openPanel(false); }
+
+readSensors();
+appData = snapshot();
+$('#jsonPkt').textContent = JSON.stringify(appData, null, 2);
+log('ok', 'Sistema iniciado. El ESP32 lee 6 sensores HC-SR04 y controla 5 bombas y 1 llave mediante 3 módulos de relé.', { local: true });
+log('info', 'Prueba: toca "Llenar" en un depósito que ya esté lleno, o ve a la pestaña Fallas y simula una tubería rota.', { local: true });
+
+let last = performance.now(), lastUi = 0;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (cfg.speed > 0) { let s = dt * cfg.speed / 60; while (s > 1e-6) { const st = Math.min(s, 0.05); simStep(st); s -= st; } }
+  telemetry(now);
+  updateVisuals(dt, now);
+  if (fly) {
+    fly.k = Math.min(1, fly.k + dt / 0.9); const e = 1 - Math.pow(1 - fly.k, 3);
+    camera.position.lerpVectors(fly.p0, fly.p1, e); controls.target.lerpVectors(fly.t0, fly.t1, e);
+    if (fly.k >= 1) fly = null;
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  placeLabels();
+  if (now - lastUi > 200) { refreshUI(); lastUi = now; }
+  requestAnimationFrame(frame);
+}
+refreshUI();
+window.__sceneReady = true;
+$('#loading').hidden = true;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

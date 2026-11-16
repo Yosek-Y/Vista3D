@@ -14,6 +14,6 @@ Abre `index.html` en Chrome, Edge o Firefox. Necesita internet la primera vez po
 - **Alertas**: registro del asistente. Con el botón "Voz" el asistente lee en voz alta las alertas.
 - **Piezas**: para qué sirve cada pieza comprada, pines sugeridos del ESP32 y notas para armar la maqueta.
 
-Para ver la escena completa usa el botón "Ocultar paneles" (o la tecla H). Al tocar la pestaña activa, el panel se minimiza, y el botón − minimiza el asistente.
+Para ver la escena completa usa el botón "Ocultar paneles" (o la tecla H). La flecha al final de las pestañas minimiza o abre el panel, y el botón − minimiza el asistente.
 
 Haz clic en cualquier depósito, bomba o animal de la escena para acercar la cámara. La velocidad de simulación (1× a 300×) está en la barra superior.

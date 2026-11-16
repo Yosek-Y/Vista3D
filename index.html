@@ -92,6 +92,11 @@ body.clean #panel,body.clean #assistant{display:none}
   width:384px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden}
 .tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
 .tab{flex:1;background:none;border:0;padding:11px 4px 10px;cursor:pointer;color:var(--muted);font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.02em;border-bottom:2px solid transparent;position:relative}
+.collapse-btn{flex:none;width:40px;background:none;border:0;border-left:1px solid var(--line);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.collapse-btn:hover{color:var(--ink);background:var(--raise)}
+.collapse-btn:focus-visible{outline:2px solid var(--water);outline-offset:-2px}
+.collapse-btn svg{width:18px;height:18px;transition:transform .2s}
+#panel:not(.collapsed) .collapse-btn svg{transform:rotate(180deg)}
 .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--water)}
 .tab .badge{position:absolute;top:6px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--crit);color:#fff;font-family:var(--f-mono);font-size:10px;line-height:16px}
 .views{flex:1;overflow-y:auto;overscroll-behavior:contain}
@@ -226,6 +231,8 @@ pre.code{margin:8px 0 0;overflow:auto;font-family:var(--f-mono);font-size:11.5px
   #panel.collapsed{bottom:auto}
   #panel.collapsed .views{display:none}
   #panel.collapsed .tabs{border-bottom:0}
+  #panel:not(.collapsed) .collapse-btn svg{transform:none}
+  #panel.collapsed .collapse-btn svg{transform:rotate(180deg)}
 }
 @media (min-width: 761px) and (max-width: 1100px){
   #assistant{width:300px;max-height:30vh}
@@ -273,6 +280,7 @@ pre.code{margin:8px 0 0;overflow:auto;font-family:var(--f-mono);font-size:11.5px
     <button class="tab" role="tab" id="tab-fallas" aria-selected="false" data-view="fallas">Fallas</button>
     <button class="tab" role="tab" id="tab-alertas" aria-selected="false" data-view="alertas">Alertas<span class="badge" id="alertBadge" hidden>0</span></button>
     <button class="tab" role="tab" id="tab-hardware" aria-selected="false" data-view="hardware">Piezas</button>
+    <button class="collapse-btn" id="collapseBtn" aria-expanded="true" aria-label="Minimizar panel" title="Minimizar panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
   </div>
   <div class="views">
     <!-- APP / MONITOR -->
@@ -1251,10 +1259,12 @@ function updateLabelContent() {
   for (const id of TANK_IDS) {
     const t = TANKS[id], a = ACTS[t.filler], st = stateOf(t.reading);
     const pump = a.locked ? `<span class="chip lock">${a.id} BLOQUEADA</span>` : a.on ? `<span class="chip on">${a.id} LLENANDO</span>` : '';
-    vis[id].label.el.className = 'tag' + ((st.k === 'bajo' || st.k === 'vacio' || st.k === 'err' || a.locked) ? ' alarm' : '');
-    vis[id].label.el.innerHTML = `<b>${t.name}</b><span class="p">${t.reading === null ? '--' : pct(t.reading)}</span><span class="chip ${st.k}">${st.t}</span><div class="s"><span class="muted mono">${t.reading === null ? 'sin lectura' : nf.format(t.reading * t.cap) + ' L · ' + distCm(t).toFixed(1) + ' cm'}</span>${pump}</div>`;
+    const el = vis[id].label.el;
+    el.className = 'tag' + ((st.k === 'bajo' || st.k === 'vacio' || st.k === 'err' || a.locked) ? ' alarm' : '');
+    const html = `<b>${t.name}</b><span class="p">${t.reading === null ? '--' : pct(t.reading)}</span><span class="chip ${st.k}">${st.t}</span><div class="s"><span class="muted mono">${t.reading === null ? 'sin lectura' : nf.format(t.reading * t.cap) + ' L · ' + distCm(t).toFixed(1) + ' cm'}</span>${pump}</div>`;
+    if (el._html !== html) { el.innerHTML = html; el._html = html; }
   }
-  miniLabels.forEach(m => m.l.el.innerHTML = m.html());
+  miniLabels.forEach(m => { const h = m.html(); if (m.l.el._html !== h) { m.l.el.innerHTML = h; m.l.el._html = h; } });
 }
 
 /* =====================================================================
@@ -1385,20 +1395,22 @@ function updateVisuals(dt, now) {
 let currentView = 'monitor';
 const isClean = () => document.body.classList.contains('clean');
 function showView(v) {
+  if (v !== currentView) $('#panel .views').scrollTop = 0;
   currentView = v;
   document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === v)));
   document.querySelectorAll('.view').forEach(s => s.hidden = s.id !== 'view-' + v);
   if (v === 'alertas') { unread = 0; renderLog(); }
   openPanel(true);
 }
-document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
-  // tocar la pestaña activa minimiza el panel (queda solo la fila de pestañas)
-  if (t.dataset.view === currentView && !$('#panel').classList.contains('collapsed')) openPanel(false);
-  else showView(t.dataset.view);
-}));
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showView(t.dataset.view)));
+$('#collapseBtn').addEventListener('click', () => openPanel($('#panel').classList.contains('collapsed')));
 $('#openAlerts').addEventListener('click', () => showView('alertas'));
 $('#clearLog').addEventListener('click', () => { logEntries.length = 0; renderLog(); });
-function openPanel(open) { $('#panel').classList.toggle('collapsed', !open); }
+function openPanel(open) {
+  $('#panel').classList.toggle('collapsed', !open);
+  const b = $('#collapseBtn'), t = open ? 'Minimizar panel' : 'Abrir panel';
+  b.setAttribute('aria-expanded', String(open)); b.setAttribute('aria-label', t); b.title = t;
+}
 function setClean(on) {
   document.body.classList.toggle('clean', on);
   const b = $('#hideBtn'), txt = on ? 'Mostrar paneles' : 'Ocultar paneles';
@@ -1556,6 +1568,7 @@ function actText(a) {
   if (a.src && !srcOk(a, 0.02)) return `${a.id} en espera: falta agua en la fuente`;
   return `${a.id} ${a.type === 'valve' ? 'cerrada' : 'apagada'}`;
 }
+let lastLockHtml = '';
 function refreshUI() {
   const now = performance.now();
   $('#clock').textContent = clockStr(simMin);
@@ -1605,8 +1618,9 @@ function refreshUI() {
     el.style.color = b.broken ? 'var(--crit)' : '';
   }
   const locked = ACT_IDS.filter(k => ACTS[k].locked);
-  $('#lockList').innerHTML = locked.length ? locked.map(k => `<div class="fitem"><div class="lbl">${k} · ${ACTS[k].name}<small>bloqueada a las ${clockStr(ACTS[k].faultAt, false)}</small></div><button class="btn small" data-rearm="${k}">Rearmar</button></div>`).join('')
+  const lockHtml = locked.length ? locked.map(k => `<div class="fitem"><div class="lbl">${k} · ${ACTS[k].name}<small>bloqueada a las ${clockStr(ACTS[k].faultAt, false)}</small></div><button class="btn small" data-rearm="${k}">Rearmar</button></div>`).join('')
     : '<div class="fitem"><div class="lbl muted">Ninguna bomba bloqueada.</div></div>';
+  if (lockHtml !== lastLockHtml) { $('#lockList').innerHTML = lockHtml; lastLockHtml = lockHtml; }
   for (const id of ACT_IDS) { const l = $('#pinled-' + id); if (l) l.className = 'led' + (ACTS[id].locked ? ' lock' : ACTS[id].on ? ' on' : ''); }
   updateLabelContent();
 }

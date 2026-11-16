@@ -65,7 +65,18 @@ button,input,select{font:inherit;color:inherit}
 .btn.small{padding:5px 9px;font-size:12.5px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn svg{width:15px;height:15px}
-#panelToggle{display:none}
+/* modo "solo escena": oculta paneles con scroll */
+body.clean #panel,body.clean #assistant{display:none}
+/* barras de scroll finas que solo aparecen al pasar el mouse */
+.views,#assistant .log,pre.json,pre.code,.tbl-wrap{scrollbar-width:thin;scrollbar-color:transparent transparent}
+.views:hover,#assistant .log:hover,pre.json:hover,pre.code:hover,.tbl-wrap:hover{scrollbar-color:rgba(173,205,222,.35) transparent}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:transparent;border-radius:6px}
+:hover::-webkit-scrollbar-thumb{background:rgba(173,205,222,.35)}
+#assistant.min .log{display:none}
+#assistant.min header{border-bottom:0}
+.icon-btn{width:30px;padding:5px 0}
 
 /* interruptor */
 .switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:13px}
@@ -198,8 +209,7 @@ pre.code{margin:8px 0 0;overflow:auto;font-family:var(--f-mono);font-size:11.5px
   .brand h1{font-size:18px}
   #topbar{gap:8px 10px}
   .tb-spacer{display:none}
-  #panelToggle{display:inline-flex}
-  #voiceBtn span,#camBtn span{display:none}
+  #voiceBtn span,#camBtn span,#hideBtn span{display:none}
   .clock{padding:6px 8px;font-size:12px}
   .seg button{padding:6px 7px}
   #assistant{display:none}
@@ -211,6 +221,11 @@ pre.code{margin:8px 0 0;overflow:auto;font-family:var(--f-mono);font-size:11.5px
   .tag{font-size:11px;padding:4px 6px}
   .tag .s{display:none}
   .tag.mini{display:none!important}
+}
+@media (min-width: 761px){
+  #panel.collapsed{bottom:auto}
+  #panel.collapsed .views{display:none}
+  #panel.collapsed .tabs{border-bottom:0}
 }
 @media (min-width: 761px) and (max-width: 1100px){
   #assistant{width:300px;max-height:30vh}
@@ -247,7 +262,7 @@ pre.code{margin:8px 0 0;overflow:auto;font-family:var(--f-mono);font-size:11.5px
   <div class="tb-group">
     <button class="btn" id="voiceBtn" aria-pressed="false" aria-label="Voz del asistente" title="Voz del asistente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 8.5a5 5 0 0 1 0 7"/></svg><span>Voz apagada</span></button>
     <button class="btn" id="camBtn" title="Volver a la vista general" aria-label="Vista general"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span>Vista general</span></button>
-    <button class="btn" id="panelToggle" aria-expanded="true">Panel</button>
+    <button class="btn" id="hideBtn" aria-pressed="false" aria-label="Ocultar paneles" title="Ocultar paneles para ver toda la escena (tecla H)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Ocultar paneles</span></button>
   </div>
 </header>
 
@@ -400,7 +415,7 @@ if (bombaOn[i]) {
 </aside>
 
 <section id="assistant" aria-live="polite">
-  <header><h2><span class="speaking" id="speakDot"></span>Asistente</h2><button class="btn small" id="openAlerts">Ver todo</button></header>
+  <header><h2><span class="speaking" id="speakDot"></span>Asistente</h2><div class="row"><button class="btn small" id="openAlerts">Ver todo</button><button class="btn small icon-btn" id="minAssist" aria-expanded="true" aria-label="Minimizar asistente" title="Minimizar asistente">−</button></div></header>
   <ul class="log" id="logMini"></ul>
 </section>
 <div id="toasts"></div>
@@ -1221,7 +1236,7 @@ const miniLabels = [
   { anchor: V(-4, 1.4, 1.1), html: () => `<b>Bombas</b>B5 · B4 · B3 · B2`, tank: null },
   { anchor: V(5, 4.9, 7.5), html: () => `<b>ESP32</b>${cfg.wifi ? 'enviando por WiFi' : 'sin WiFi'}`, cabinet: true },
 ];
-miniLabels.forEach(m => { m.l = addLabel(m.anchor, 'mini', () => m.cabinet ? showView('hardware') : m.tank && selectTank(m.tank)); });
+miniLabels.forEach(m => { m.l = addLabel(m.anchor, 'mini', () => m.cabinet ? (!isClean() && showView('hardware')) : m.tank && selectTank(m.tank)); });
 const _v = new THREE.Vector3();
 function placeLabels() {
   const w = window.innerWidth, h = window.innerHeight;
@@ -1368,6 +1383,7 @@ function updateVisuals(dt, now) {
    7. INTERFAZ (panel tipo app)
    ===================================================================== */
 let currentView = 'monitor';
+const isClean = () => document.body.classList.contains('clean');
 function showView(v) {
   currentView = v;
   document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === v)));
@@ -1375,14 +1391,29 @@ function showView(v) {
   if (v === 'alertas') { unread = 0; renderLog(); }
   openPanel(true);
 }
-document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showView(t.dataset.view)));
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  // tocar la pestaña activa minimiza el panel (queda solo la fila de pestañas)
+  if (t.dataset.view === currentView && !$('#panel').classList.contains('collapsed')) openPanel(false);
+  else showView(t.dataset.view);
+}));
 $('#openAlerts').addEventListener('click', () => showView('alertas'));
 $('#clearLog').addEventListener('click', () => { logEntries.length = 0; renderLog(); });
-function openPanel(open) {
-  const p = $('#panel'); p.classList.toggle('collapsed', !open); $('#panelToggle').setAttribute('aria-expanded', String(open));
+function openPanel(open) { $('#panel').classList.toggle('collapsed', !open); }
+function setClean(on) {
+  document.body.classList.toggle('clean', on);
+  const b = $('#hideBtn'), txt = on ? 'Mostrar paneles' : 'Ocultar paneles';
+  b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', txt); b.querySelector('span').textContent = txt;
 }
-$('#panelToggle').addEventListener('click', () => openPanel($('#panel').classList.contains('collapsed')));
-$('#panel .tabs').addEventListener('dblclick', () => openPanel($('#panel').classList.contains('collapsed')));
+$('#hideBtn').addEventListener('click', () => setClean(!document.body.classList.contains('clean')));
+window.addEventListener('keydown', e => {
+  if (e.target.closest('input,select,textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'h' || e.key === 'H') setClean(!document.body.classList.contains('clean'));
+});
+$('#minAssist').addEventListener('click', () => {
+  const min = $('#assistant').classList.toggle('min');
+  const b = $('#minAssist'); b.textContent = min ? '+' : '−';
+  b.setAttribute('aria-expanded', String(!min)); b.setAttribute('aria-label', min ? 'Mostrar asistente' : 'Minimizar asistente'); b.title = b.getAttribute('aria-label');
+});
 
 // lista de la app
 const appRows = {};
@@ -1597,7 +1628,7 @@ function selectTank(id, toControl = true) {
   if (vis[id].view) flyTo(vis[id].focus.clone().addScaledVector(vis[id].view.clone().normalize(), dist), vis[id].focus);
   else focusOn(vis[id].focus, dist);
   clearSel(); ctl[id].c.classList.add('sel');
-  if (toControl) { showView('control'); ctl[id].c.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' }); }
+  if (toControl && !isClean()) { showView('control'); ctl[id].c.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' }); }
 }
 const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
 let downAt = null;
@@ -1606,7 +1637,7 @@ canvas.addEventListener('pointerup', e => {
   if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
   const hit = pick(e);
   if (hit?.tank) selectTank(hit.tank);
-  else if (hit?.cabinet) { focusOn(cab.boxPos, 6); showView('hardware'); }
+  else if (hit?.cabinet) { focusOn(cab.boxPos, 6); if (!isClean()) showView('hardware'); }
 });
 let hoverT = 0;
 canvas.addEventListener('pointermove', e => {

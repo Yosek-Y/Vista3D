@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Maqueta Hídrica 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: la maqueta a escala real (1 unidad = 1 cm) sobre una mesa; barra de vistas arriba, panel de armado a la izquierda (abajo en móvil).
+   Mismo sistema visual que la simulación: paneles oscuros tipo cuarto de control, un solo tema elegido a propósito. */
+:root{
+  --bg:#0d171d;
+  --panel:rgba(13,24,31,.93);
+  --raise:rgba(180,215,232,.06);
+  --line:rgba(173,205,222,.15);
+  --ink:#e3edf2;
+  --muted:#8fa7b4;
+  --water:#4ab6e6;
+  --water-deep:#1d7fb3;
+  --ok:#4fc58e;
+  --warn:#efb23d;
+  --crit:#f0604f;
+  --wood:#d9b77e;
+  --f-display:'Barlow Semi Condensed','Arial Narrow',system-ui,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Consolas,monospace;
+  --topbar-h:64px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+a{color:var(--water)}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* barra superior */
+#topbar{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
+  padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:var(--panel);border-bottom:1px solid var(--line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand-mark{width:30px;height:30px;flex:none}
+.brand h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:21px;line-height:1}
+.brand small{display:block;color:var(--muted);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.tb-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tb-spacer{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--raise);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap;text-decoration:none;color:var(--ink);transition:background .15s}
+.btn:hover{background:rgba(180,215,232,.12)}
+.btn:focus-visible,.seg button:focus-visible,.tab:focus-visible,.step:focus-visible,.collapse-btn:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+.btn[aria-pressed="true"]{background:var(--water-deep);border-color:transparent;color:#fff}
+.btn.small{padding:5px 9px;font-size:12.5px}
+.btn svg{width:15px;height:15px;flex:none}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{background:none;border:0;padding:6px 9px;cursor:pointer;font-family:var(--f-mono);font-size:12.5px;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--water-deep);color:#fff}
+.seg-label{font-size:12px;color:var(--muted)}
+
+/* panel */
+#panel{position:fixed;z-index:15;top:calc(var(--topbar-h) + 12px);left:max(12px,env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  width:400px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden}
+body.clean #panel{display:none}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tab{flex:1;background:none;border:0;padding:11px 4px 10px;cursor:pointer;color:var(--muted);font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.02em;border-bottom:2px solid transparent}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--water)}
+.collapse-btn{flex:none;width:40px;background:none;border:0;border-left:1px solid var(--line);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.collapse-btn:hover{color:var(--ink);background:var(--raise)}
+.collapse-btn svg{width:18px;height:18px;transition:transform .2s}
+.views{flex:1;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:transparent transparent}
+.views:hover{scrollbar-color:rgba(173,205,222,.35) transparent}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:transparent;border-radius:6px}
+:hover::-webkit-scrollbar-thumb{background:rgba(173,205,222,.35)}
+.view{padding:14px 14px 22px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:12px}
+.card h3{margin:0 0 4px;font-family:var(--f-display);font-weight:600;font-size:17px}
+.sec-title{color:var(--muted);text-transform:uppercase;font-family:var(--f-display);font-weight:600;font-size:12.5px;letter-spacing:.09em;margin:4px 0 0}
+.hint{color:var(--muted);font-size:12.5px;margin:0}
+p{margin:0}
+
+/* pasos de armado */
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.step{display:grid;grid-template-columns:30px 1fr;gap:4px 10px;width:100%;text-align:left;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;color:var(--ink)}
+.step:hover{border-color:rgba(74,182,230,.5)}
+.step .n{grid-row:span 2;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.step b{font-weight:600}
+.step .body{grid-column:2;font-size:13px;color:#c9d7de;display:none}
+.step[aria-expanded="true"]{border-color:var(--water);background:rgba(74,182,230,.08)}
+.step[aria-expanded="true"] .n{background:var(--water-deep);border-color:transparent;color:#fff}
+.step[aria-expanded="true"] .body{display:block}
+.step .tip{display:block;margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(239,178,61,.12);color:#f6d79a;font-size:12.5px}
+.step-nav{display:flex;gap:8px;justify-content:space-between}
+
+/* pieza */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:10px 0 0;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.level{height:8px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:8px}
+.level i{display:block;height:100%;background:linear-gradient(90deg,var(--water-deep),var(--water))}
+.chip{display:inline-block;font-family:var(--f-mono);font-size:10.5px;font-weight:500;letter-spacing:.05em;padding:2px 6px;border-radius:5px;white-space:nowrap}
+.chip.have{background:rgba(79,197,142,.18);color:#8fe2b9}
+.chip.buy{background:rgba(239,178,61,.18);color:#f6cf82}
+.chip.get{background:rgba(143,167,180,.2);color:#c8d6de}
+.chip.on{background:rgba(74,182,230,.2);color:#9fdbf6}
+
+/* tablas */
+.tbl-wrap{overflow-x:auto;scrollbar-width:thin}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:6px 8px 6px 0;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:500;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em}
+td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.row-click{cursor:pointer} tr.row-click:hover td{background:rgba(74,182,230,.06)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:3px;vertical-align:-1px}
+.totals{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.total{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.total b{display:block;font-family:var(--f-mono);font-size:20px;font-weight:500}
+.total span{color:var(--muted);font-size:12px}
+
+/* etiquetas */
+#labels{position:fixed;inset:0;pointer-events:none;z-index:5;overflow:hidden}
+body.nolabels #labels{display:none}
+.tag{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;background:rgba(12,22,28,.86);border:1px solid rgba(173,205,222,.22);border-radius:8px;padding:4px 8px;white-space:nowrap;font-size:12px;line-height:1.3;will-change:transform}
+.tag::after{content:"";position:absolute;left:50%;bottom:-5px;width:8px;height:8px;background:inherit;border-right:1px solid rgba(173,205,222,.22);border-bottom:1px solid rgba(173,205,222,.22);transform:translateX(-50%) rotate(45deg)}
+.tag b{font-weight:600}
+.tag .m{color:var(--muted);font-family:var(--f-mono);font-size:11px;margin-left:6px}
+.tag.hl{border-color:var(--water);box-shadow:0 0 0 2px rgba(74,182,230,.35)}
+
+#loading{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:var(--bg);color:var(--muted);font-family:var(--f-display);font-size:18px;text-align:center;padding:0 24px}
+
+@media (min-width:761px){
+  #panel.collapsed{bottom:auto}
+  #panel.collapsed .views{display:none}
+  #panel.collapsed .tabs{border-bottom:0}
+  #panel.collapsed .collapse-btn svg{transform:rotate(180deg)}
+}
+@media (max-width:760px){
+  .brand small,.btn .t{display:none}
+  .brand h1{font-size:18px}
+  .tb-spacer{display:none}
+  #panel{top:auto;left:0;right:0;width:auto;bottom:0;height:50%;border-radius:14px 14px 0 0;border-bottom:0;
+    padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px);transition:transform .25s ease}
+  #panel:not(.collapsed) .collapse-btn svg{transform:rotate(180deg)}
+  #panel.collapsed{transform:translateY(calc(100% - 46px - env(safe-area-inset-bottom,0px)))}
+  .view{padding-left:16px;padding-right:16px}
+  .tag{font-size:11px;padding:3px 6px}
+  .tag .m{display:none}
+}
+@media (prefers-reduced-motion: reduce){ #panel{transition:none} }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="scene" tabindex="0" aria-label="Maqueta 3D a escala: base de hielo seco con botellas cortadas como pozo, tanque, tinaco y bebederos, sensores, bombas, mangueras y cables"></canvas>
+<div id="labels"></div>
+
+<header id="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="18" width="26" height="6" rx="1.5" fill="#e9ecef"/><path d="M9 6h6v12H9z" fill="#4ab6e6" opacity=".85"/><path d="M8 5h8" stroke="#cfe8f4" stroke-width="1.5"/><path d="M19 13h8v5h-8z" fill="#4ab6e6" opacity=".85"/><path d="M6 24v4M26 24v4" stroke="#8fa7b4" stroke-width="2"/></svg>
+    <div><h1>Maqueta Hídrica</h1><small>Escala real · 1 unidad = 1 cm</small></div>
+  </div>
+  <div class="tb-group">
+    <button class="btn" id="vHome" title="Vista general"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span class="t">General</span></button>
+    <button class="btn" id="vUnder" title="Ver los cables por debajo de la plancha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h18"/><path d="M6 12c3 0 3 5 6 5s3-5 6-5"/></svg><span class="t">Por debajo</span></button>
+    <button class="btn" id="vElec" title="Acercar a la electrónica"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg><span class="t">Electrónica</span></button>
+    <button class="btn" id="xray" aria-pressed="false" title="Hacer transparente la plancha para ver los cables"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="7" width="18" height="10" rx="1" stroke-dasharray="3 2"/><path d="M7 12h10"/></svg><span class="t">Rayos X</span></button>
+    <button class="btn" id="lblBtn" aria-pressed="true" title="Mostrar u ocultar los nombres"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="t">Nombres</span></button>
+  </div>
+  <div class="tb-group" role="group" aria-label="Agua en movimiento">
+    <span class="seg-label">Agua</span>
+    <div class="seg" id="speedSeg">
+      <button data-speed="0" aria-pressed="false" title="Pausa">II</button>
+      <button data-speed="1" aria-pressed="true" title="Velocidad real de las mini bombas">1×</button>
+      <button data-speed="5" aria-pressed="false">5×</button>
+    </div>
+  </div>
+  <div class="tb-spacer"></div>
+  <div class="tb-group">
+    <button class="btn" id="hideBtn" aria-pressed="false" title="Ocultar el panel (tecla H)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span class="t">Ocultar panel</span></button>
+    <a class="btn" id="simLink" href="index.html" title="Abrir la simulación de la granja"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg><span class="t">Simulación</span></a>
+  </div>
+</header>
+
+<aside id="panel" aria-label="Guía de la maqueta">
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-view="armado">Armado</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="pieza">Pieza</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="materiales">Materiales</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="cables">Cables</button>
+    <button class="collapse-btn" id="collapseBtn" aria-expanded="true" aria-label="Minimizar panel" title="Minimizar panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
+  </div>
+  <div class="views">
+    <section class="view" id="view-armado">
+      <p class="hint">Toca un paso para ver qué piezas se usan. La cámara se mueve sola y las piezas del paso se iluminan en azul.</p>
+      <ol class="steps" id="steps"></ol>
+      <div class="step-nav"><button class="btn small" id="prevStep">← Anterior</button><button class="btn small" id="nextStep">Siguiente →</button></div>
+    </section>
+    <section class="view" id="view-pieza" hidden>
+      <div class="card" id="pieceCard">
+        <h3>Toca una pieza</h3>
+        <p class="hint">Haz clic en cualquier botella, sensor, bomba, manguera o en la electrónica para ver de qué está hecha, sus medidas y cómo se conecta.</p>
+      </div>
+    </section>
+    <section class="view" id="view-materiales" hidden>
+      <div class="totals">
+        <div class="total"><b id="totHose">—</b><span>de manguera (con 5 cm de holgura por tramo)</span></div>
+        <div class="total"><b id="totCable">—</b><span>de cable en total (12 tramos)</span></div>
+      </div>
+      <div class="card">
+        <h3>Lista de materiales</h3>
+        <div class="tbl-wrap"><table><thead><tr><th>Material</th><th>Cant.</th><th>Para qué</th></tr></thead><tbody id="bom"></tbody></table></div>
+      </div>
+      <div class="card">
+        <h3>Manguera por tramo</h3>
+        <div class="tbl-wrap"><table><thead><tr><th>Bomba</th><th>Desde → hasta</th><th>Largo</th></tr></thead><tbody id="hoseTable"></tbody></table></div>
+      </div>
+    </section>
+    <section class="view" id="view-cables" hidden>
+      <div class="card">
+        <h3>Colores de los cables</h3>
+        <p class="hint" style="color:var(--ink)"><span class="sw" style="background:#e5483d"></span>VCC 3.3 V / 5 V &nbsp; <span class="sw" style="background:#2a2a2a;outline:1px solid #555"></span>GND &nbsp; <span class="sw" style="background:#f2c230"></span>TRIG &nbsp; <span class="sw" style="background:#3fb36b"></span>ECHO</p>
+        <p class="hint" style="margin-top:6px">Las bombas llevan dos hilos: rojo (va al relé) y negro (GND). Toca una fila para ver ese cable en la maqueta.</p>
+      </div>
+      <div class="card">
+        <h3>Cableado</h3>
+        <div class="tbl-wrap"><table><thead><tr><th>Desde</th><th>Hacia</th><th>Pines ESP32</th><th>Largo</th></tr></thead><tbody id="cableTable"></tbody></table></div>
+      </div>
+      <div class="card">
+        <h3>Antes de pegar los cables</h3>
+        <p class="hint" style="color:var(--ink)">Los jumpers que compraron miden 20 cm y los tramos aquí miden más. Para ir por debajo de la plancha es más fácil usar cable de red (UTP): trae 8 hilos, alcanza para 2 sensores. Al final se le sueldan o se le empalman los jumpers para conectar a la protoboard.</p>
+      </div>
+    </section>
+  </div>
+</aside>
+<div id="loading"><div id="loadingText">Cargando la maqueta 3D…</div></div>
+<script>
+  setTimeout(function(){ if(!window.__sceneReady){ var t=document.getElementById('loadingText'); if(t) t.textContent='No se pudo cargar la librería 3D (Three.js). Revisa tu conexión a internet y recarga la página.'; } }, 12000);
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = s => document.querySelector(s);
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const cm = n => `${Math.round(n)} cm`;
+const meters = n => (n / 100).toFixed(2).replace('.', ',') + ' m';
+
+/* =====================================================================
+   ESCENA (1 unidad = 1 cm; arriba de la plancha y = 0)
+   ===================================================================== */
+const canvas = $('#scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#cfd8dd');
+scene.fog = new THREE.Fog('#cfd8dd', 260, 520);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.5, 1500);
+const HOME = { pos: V(-38, 96, 116), target: V(-1, 0, -1) };
+camera.position.copy(HOME.pos);
+const controls = new OrbitControls(camera, canvas);
+controls.target.copy(HOME.target);
+controls.enableDamping = true;
+controls.minDistance = 12; controls.maxDistance = 320;
+
+scene.add(new THREE.HemisphereLight('#ffffff', '#c9bfb2', 1.2));
+const sun = new THREE.DirectionalLight('#fff4e2', 2.1);
+sun.position.set(60, 140, 70);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -90, right: 90, top: 90, bottom: -90, near: 10, far: 400 });
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+const fill = new THREE.DirectionalLight('#dfe9ff', 0.6); fill.position.set(-80, 40, -60); scene.add(fill);
+
+const M = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, metalness: 0, ...o });
+const MAT = {
+  table: M('#9a7552', { roughness: 0.7 }), foam: null, wood: M('#d9b77e'), skewer: M('#c9a26a'), card: M('#c8a77a'), cardDark: M('#9e7f58'),
+  roofCard: M('#b9b3a8'), pcbBlue: M('#1f5fa8', { roughness: 0.6 }), pcbBlack: M('#1d2125', { roughness: 0.6 }), silver: M('#d3d7da', { metalness: 0.7, roughness: 0.3 }),
+  black: M('#1b1c1f', { roughness: 0.6 }), pump: M('#26282c', { roughness: 0.5 }), relayCube: M('#2b6fd6', { roughness: 0.45 }), stone: M('#8f8a82'),
+  water: new THREE.MeshStandardMaterial({ color: '#2f95d6', transparent: true, opacity: 0.72, roughness: 0.1, emissive: '#0b3a5a', emissiveIntensity: 0.3, depthWrite: false }),
+  hose: new THREE.MeshStandardMaterial({ color: '#d9eef6', transparent: true, opacity: 0.6, roughness: 0.2, depthWrite: false }),
+  flow: new THREE.MeshBasicMaterial({ color: '#4fc3f7' }),
+};
+const pet = () => new THREE.MeshStandardMaterial({ color: '#dcefea', transparent: true, opacity: 0.2, roughness: 0.15, side: THREE.DoubleSide, depthWrite: false });
+// textura de hielo seco (bolitas de poliestireno)
+{
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'); g.fillStyle = '#f3f4f2'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 900; i++) { const x = Math.random() * 256, y = Math.random() * 256, r = 3 + Math.random() * 5; g.strokeStyle = `rgba(150,155,160,${0.08 + Math.random() * 0.12})`; g.lineWidth = 1; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.stroke(); }
+  const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(1 / 12, 1 / 12); tex.colorSpace = THREE.SRGBColorSpace;
+  MAT.foam = new THREE.MeshStandardMaterial({ map: tex, color: '#ffffff', roughness: 0.95 });
+}
+
+function mesh(geo, mat, x = 0, y = 0, z = 0, parent = scene, shadow = true) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z);
+  if (shadow) { m.castShadow = true; m.receiveShadow = true; }
+  parent.add(m); return m;
+}
+const box = (w, h, d, mat, x, y, z, p, s) => mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z, p, s);
+const cyl = (rt, rb, h, mat, x, y, z, p, seg = 20, s) => mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat, x, y, z, p, s);
+
+/* ---------- piezas (para clic, resaltado e información) ---------- */
+const PARTS = {};
+const clickables = [];
+function part(id, data) { PARTS[id] = { id, meshes: [], ...data }; return PARTS[id]; }
+function own(id, obj) {
+  obj.traverse(o => {
+    if (!o.isMesh) return;
+    if (o.material && o.material.emissive && !o.userData.shared) o.material = o.material.clone();
+    o.userData.part = id; PARTS[id].meshes.push(o); clickables.push(o);
+  });
+  return obj;
+}
+
+/* =====================================================================
+   MESA, PLANCHA DE HIELO SECO Y SOPORTES
+   ===================================================================== */
+const BOARD = { w: 100, d: 60, t: 2.5, legH: 15 };
+const TABLE_Y = -BOARD.t - BOARD.legH;
+const table = box(180, 3, 120, MAT.table, 0, TABLE_Y - 1.5, 0, scene, false); table.receiveShadow = true;
+
+const POZO = { x: -36, z: 8, r: 5.2, top: 2, bottom: -14 };
+const HOLES = {};   // agujeros para cables (se llenan más abajo)
+const holeList = [
+  ['pozoS', -35, 16.2], ['pozoB', -31, 13], ['red', -36.6, -15.6], ['resS', -7.6, -8.6], ['resB', -7.6, 4.6],
+  ['casa', -15.2, -26.8], ['vacas', 26, -28.6], ['caballos', 26, -9.1], ['cerdos', 26, 10.4], ['E', -4, 16.4],
+];
+holeList.forEach(([k, x, z]) => HOLES[k] = V(x, 0, z));
+{
+  const s = new THREE.Shape();
+  s.moveTo(-BOARD.w / 2, -BOARD.d / 2); s.lineTo(BOARD.w / 2, -BOARD.d / 2); s.lineTo(BOARD.w / 2, BOARD.d / 2); s.lineTo(-BOARD.w / 2, BOARD.d / 2); s.closePath();
+  const hole = (x, z, r) => { const h = new THREE.Path(); h.absarc(x, -z, r, 0, Math.PI * 2, true); s.holes.push(h); };
+  hole(POZO.x, POZO.z, POZO.r + 0.3);
+  holeList.forEach(([, x, z]) => hole(x, z, 0.6));
+  const geo = new THREE.ExtrudeGeometry(s, { depth: BOARD.t, bevelEnabled: false, curveSegments: 28 });
+  geo.rotateX(-Math.PI / 2); geo.translate(0, -BOARD.t, 0);
+  part('base', { name: 'Plancha de hielo seco', anchor: V(-46, 1, 27), mini: true,
+    info: { Material: 'Hielo seco (poliestireno expandido, también llamado anime, unicel o icopor)', Medidas: '100 × 60 cm, 2.5 cm de grosor', 'Cómo': 'Se clavan las piezas con palillos y silicón. Los agujeros de cable (Ø 1 cm) se abren con un destornillador caliente o un lápiz.', Nota: 'El silicón muy caliente derrite el hielo seco: déjalo enfriar unos segundos antes de pegar.' } });
+  const board = own('base', mesh(geo, MAT.foam, 0, 0, 0, scene));
+  board.castShadow = true; board.receiveShadow = true;
+  // soportes en las esquinas
+  part('soportes', { name: 'Soportes de 15 cm', anchor: V(44, -6, 30), mini: true,
+    info: { Material: 'Bloques de hielo seco apilados, vasos plásticos o cajitas de cartón', Medidas: '4 piezas de 10 × 10 cm y 15 cm de alto', 'Para qué': 'Elevan la plancha: debajo pasan los cables y cuelga el fondo del pozo.' } });
+  const sg = new THREE.Group(); scene.add(sg);
+  for (const sx of [-44, 44]) for (const sz of [-24, 24]) box(10, BOARD.legH, 10, MAT.foam, sx, -BOARD.t - BOARD.legH / 2, sz, sg);
+  own('soportes', sg);
+}
+
+/* =====================================================================
+   BOTELLAS
+   ===================================================================== */
+// botella PET cortada (vertical, abierta arriba)
+function uprightBottle({ id, x, z, baseY, r, h, name, info, anchorDy = 6, cap }) {
+  const g = new THREE.Group(); g.position.set(x, baseY, z); scene.add(g);
+  const prof = [[0, 0.7], [r * 0.45, 0.35], [r * 0.82, 0], [r, 1.0], [r, h]].map(([a, b]) => new THREE.Vector2(a, b));
+  const shell = mesh(new THREE.LatheGeometry(prof, 40), pet(), 0, 0, 0, g, false); shell.renderOrder = 3;
+  const rim = mesh(new THREE.TorusGeometry(r, 0.09, 6, 40), M('#e9f3f5', { roughness: 0.3 }), 0, h, 0, g, false); rim.rotation.x = Math.PI / 2;
+  const water = mesh(new THREE.CylinderGeometry(r * 0.96, r * 0.96, 1, 36), MAT.water, 0, 0, 0, g, false); water.renderOrder = 2; water.userData.shared = true;
+  const inner = h - 1.2;
+  part(id, { name, anchor: V(x, baseY + h + anchorDy, z), info, cap,
+    setLevel(f) { const hh = Math.max(0.01, f * inner); water.scale.y = hh; water.position.y = 0.6 + hh / 2; water.visible = f > 0.01; },
+    surfaceY: f => baseY + 0.6 + f * inner, topY: baseY + h });
+  own(id, g);
+  return g;
+}
+// media botella acostada (bebedero): eje a lo largo de X, abierta arriba
+const halfCyl = (rt, rb, h) => new THREE.CylinderGeometry(rt, rb, h, 32, 1, true, -Math.PI / 2, Math.PI).rotateX(Math.PI / 2);
+const TROUGH = { r: 5, body: 18, neck: 4 };
+const troughWaterGeos = [];
+for (let i = 0; i <= 20; i++) {
+  const f = i / 20, rr = TROUGH.r * 0.95, yTop = -rr + f * (rr - 0.4);
+  if (f === 0) { troughWaterGeos.push(null); continue; }
+  const phi = Math.asin(clamp(yTop / rr, -1, 1));
+  const sh = new THREE.Shape();
+  const a0 = Math.PI - phi, a1 = 2 * Math.PI + phi;
+  for (let k = 0; k <= 24; k++) { const a = a0 + (a1 - a0) * k / 24, px = rr * Math.cos(a), py = rr * Math.sin(a); k ? sh.lineTo(px, py) : sh.moveTo(px, py); }
+  sh.closePath();
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: TROUGH.body - 0.4, bevelEnabled: false, curveSegments: 4 });
+  geo.translate(0, 0, -(TROUGH.body - 0.4) / 2);
+  troughWaterGeos.push(geo);
+}
+function trough({ id, x0, z, name, info }) {
+  // x0 = extremo cerrado (fondo de la botella); el cuello y la tapa quedan hacia +X
+  const g = new THREE.Group(); g.position.set(x0 + TROUGH.body / 2, TROUGH.r, z); g.rotation.y = Math.PI / 2; scene.add(g);
+  const shell = mesh(halfCyl(TROUGH.r, TROUGH.r, TROUGH.body), pet(), 0, 0, 0, g, false); shell.renderOrder = 3;
+  const neck = mesh(halfCyl(1.4, TROUGH.r, TROUGH.neck), pet(), 0, 0, TROUGH.body / 2 + TROUGH.neck / 2, g, false); neck.renderOrder = 3;
+  const end = mesh(new THREE.CircleGeometry(TROUGH.r, 32, Math.PI, Math.PI), pet(), 0, 0, -TROUGH.body / 2, g, false); end.renderOrder = 3;
+  const cap = cyl(1.5, 1.5, 1.2, M('#d8392b'), 0, 0, TROUGH.body / 2 + TROUGH.neck + 0.6, g, 18); cap.rotation.x = Math.PI / 2;
+  // borde de corte
+  for (const s of [-1, 1]) { const e = box(0.18, 0.18, TROUGH.body, M('#e9f3f5'), s * TROUGH.r, 0, 0, g, false); }
+  // palillos que lo sujetan a la plancha
+  for (const zz of [-6, 6]) for (const s of [-1, 1]) { const t = cyl(0.1, 0.1, 5, MAT.wood, s * (TROUGH.r + 0.2), -TROUGH.r + 1, zz, g, 6); t.rotation.z = s * 0.35; }
+  const water = mesh(new THREE.BufferGeometry(), MAT.water, 0, 0, 0, g, false); water.renderOrder = 2; water.userData.shared = true;
+  part(id, { name, anchor: V(x0 + 9, 12.5, z), info,
+    setLevel(f) { const i = Math.round(clamp(f, 0, 1) * 20); water.visible = i > 0; if (i > 0) water.geometry = troughWaterGeos[i]; },
+    surfaceY: f => -TROUGH.r * 0.95 + f * (TROUGH.r * 0.95 - 0.4) + TROUGH.r, topY: TROUGH.r * 2 });
+  own(id, g);
+}
+
+/* ---------- POZO: botella de 2 L hundida en la plancha ---------- */
+uprightBottle({ id: 'pozo', x: POZO.x, z: POZO.z, baseY: POZO.bottom, r: POZO.r, h: POZO.top - POZO.bottom, name: 'Pozo', anchorDy: 9,
+  info: { Material: 'Botella PET de 2 L', Corte: 'A 16 cm de la base', Montaje: 'Entra por un hueco de Ø 11 cm. Sobresalen 2 cm sobre la plancha y 14 cm cuelgan por debajo.', Adentro: 'Bomba B1 (manda agua al tanque de reserva)', Sensor: 'HC-SR04 en un puente de palitos a 4.5 cm sobre el borde' } });
+{ // brocal de piedritas
+  const g = new THREE.Group(); scene.add(g);
+  for (let i = 0; i < 22; i++) { const a = i / 22 * Math.PI * 2; mesh(new THREE.DodecahedronGeometry(0.85 + Math.random() * 0.3, 0), MAT.stone, POZO.x + Math.cos(a) * 6.6, 0.6, POZO.z + Math.sin(a) * 6.6, g); }
+  own('pozo', g);
+}
+/* ---------- RED DE AGUA ---------- */
+uprightBottle({ id: 'red', x: -42, z: -18, baseY: 0, r: 4.4, h: 22, name: 'Red de agua', anchorDy: 4,
+  info: { Material: 'Botella PET de 1.5 L', Corte: 'A 22 cm de la base', Representa: 'El agua de la calle que llena el pozo cuando baja', Adentro: 'Bomba V0', Sensor: 'No lleva: se rellena a mano' } });
+PARTS.red.fixed = 0.8;
+
+/* ---------- TORRE Y TANQUE DE RESERVA ---------- */
+const RES = { x: -14, z: -2, towerH: 14, r: 5.2, h: 22 };
+{
+  part('torre', { name: 'Torre de palitos', anchor: V(RES.x - 8, 9, RES.z + 7), mini: true,
+    info: { Material: '4 palitos de brocheta de 14 cm, palitos de helado y cartón', Montaje: 'Las brochetas se clavan 2 cm en el hielo seco. Los palitos de helado en X las amarran. Arriba va una plataforma de cartón de 14 × 14 cm.', Tip: 'Pega la botella a la plataforma con silicón: llena pesa casi 2 kg.' } });
+  const g = new THREE.Group(); scene.add(g);
+  for (const dx of [-5.5, 5.5]) for (const dz of [-5.5, 5.5]) cyl(0.22, 0.22, RES.towerH + 2, MAT.skewer, RES.x + dx, (RES.towerH - 2) / 2, RES.z + dz, g, 8);
+  const stick = (a, b) => { const st = box(0.9, 0.2, a.distanceTo(b), MAT.wood, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, g); st.lookAt(b); };
+  const xs = (ax, az, bx, bz) => { stick(V(ax, 1.5, az), V(bx, 12.5, bz)); stick(V(ax, 12.5, az), V(bx, 1.5, bz)); };
+  xs(RES.x - 5.5, RES.z + 5.7, RES.x + 5.5, RES.z + 5.7); xs(RES.x - 5.5, RES.z - 5.7, RES.x + 5.5, RES.z - 5.7);
+  xs(RES.x - 5.7, RES.z - 5.5, RES.x - 5.7, RES.z + 5.5); xs(RES.x + 5.7, RES.z - 5.5, RES.x + 5.7, RES.z + 5.5);
+  box(14, 0.4, 14, MAT.card, RES.x, RES.towerH + 0.2, RES.z, g);
+  own('torre', g);
+}
+uprightBottle({ id: 'reserva', x: RES.x, z: RES.z, baseY: RES.towerH + 0.4, r: RES.r, h: RES.h, name: 'Tanque de reserva', anchorDy: 8,
+  info: { Material: 'Botella PET de 2 L', Corte: 'A 22 cm de la base', Montaje: 'Pegada sobre la plataforma de la torre, a 14 cm de altura', Adentro: 'Bombas B2, B3, B4 y B5 (una por destino)', Sensor: 'HC-SR04 en un puente pegado al borde' } });
+
+/* ---------- CASA Y TINACO ---------- */
+const CASA = { x: -24, z: -20, w: 16, d: 12, h: 11 };
+{
+  part('casa', { name: 'Casa', anchor: V(CASA.x - 5, CASA.h + 3, CASA.z + 4), mini: true,
+    info: { Material: 'Caja de cartón', Medidas: '16 × 12 × 11 cm', Detalles: 'Puerta y ventanas pintadas. Techo plano de cartón con un borde de 1 cm.', Cables: 'El cable del sensor del tinaco baja por la esquina trasera.' } });
+  const g = new THREE.Group(); g.position.set(CASA.x, 0, CASA.z); scene.add(g);
+  box(CASA.w, CASA.h, CASA.d, MAT.card, 0, CASA.h / 2, 0, g);
+  box(CASA.w + 1, 0.4, CASA.d + 1, MAT.roofCard, 0, CASA.h + 0.2, 0, g);
+  for (const [w, d, x, z] of [[CASA.w + 1, 0.3, 0, CASA.d / 2 + 0.35], [CASA.w + 1, 0.3, 0, -CASA.d / 2 - 0.35], [0.3, CASA.d + 1, CASA.w / 2 + 0.35, 0], [0.3, CASA.d + 1, -CASA.w / 2 - 0.35, 0]]) box(w, 1, d, MAT.roofCard, x, CASA.h + 0.9, z, g);
+  box(3, 6, 0.1, M('#6b4a2e'), -3, 3, CASA.d / 2 + 0.05, g);
+  box(3.5, 3, 0.1, M('#6fa6c6'), 3.5, 6.5, CASA.d / 2 + 0.05, g);
+  box(0.1, 3, 3.5, M('#6fa6c6'), CASA.w / 2 + 0.05, 6.5, 0, g);
+  box(7, 1, 7, MAT.cardDark, 4, CASA.h + 0.9, -1, g);
+  own('casa', g);
+}
+uprightBottle({ id: 'tinaco', x: CASA.x + 4, z: CASA.z - 1, baseY: CASA.h + 1.4, r: 3.2, h: 11, name: 'Tinaco de la casa', anchorDy: 6,
+  info: { Material: 'Botella PET de 500 ml', Corte: 'A 11 cm de la base', Montaje: 'Sobre una base de cartón en el techo de la casa', Llena: 'Bomba B5, desde el tanque de reserva', Sensor: 'HC-SR04 en un puente pegado al borde' } });
+
+/* ---------- BEBEDEROS Y CORRALES ---------- */
+const PENS = { vacas: 'Vacas', caballos: 'Caballos', cerdos: 'Cerdos' };
+const PEN_Z = { vacas: -19.5, caballos: 0, cerdos: 19.5 };
+const TZ = id => PEN_Z[id] - 2.5;
+for (const id in PENS) {
+  trough({ id, x0: 15, z: TZ(id), name: `Bebedero de ${PENS[id].toLowerCase()}`,
+    info: { Material: 'Botella PET de 2 L cortada a lo largo, por la mitad', Medidas: `${TROUGH.body + TROUGH.neck} cm de largo, ${TROUGH.r * 2} cm de ancho, ${TROUGH.r} cm de hondo`, Montaje: 'Acostada, con la tapa puesta para que no se salga el agua. Se sujeta con 4 palillos y silicón.', Llena: { vacas: 'Bomba B2', caballos: 'Bomba B3', cerdos: 'Bomba B4' }[id], Sensor: 'HC-SR04 en un puente de palitos de helado, 3.5 cm sobre el borde' } });
+}
+{
+  part('corrales', { name: 'Cercas', anchor: V(46, 6, 0), mini: true,
+    info: { Material: 'Palitos de helado', Montaje: 'Postes de medio palito clavados cada 4 cm y dos palitos acostados pegados con silicón', Medidas: 'Corrales de 36 × 17 cm' } });
+  const g = new THREE.Group(); scene.add(g);
+  const postGeo = new THREE.BoxGeometry(1, 5, 0.2);
+  const posts = [];
+  for (const id in PENS) {
+    const z0 = PEN_Z[id] - 8.5, z1 = PEN_Z[id] + 8.5, x0 = 12, x1 = 48;
+    const side = (ax, az, bx, bz) => {
+      const L = Math.hypot(bx - ax, bz - az), n = Math.round(L / 4), ang = Math.atan2(bz - az, bx - ax);
+      for (let i = 0; i <= n; i++) posts.push([ax + (bx - ax) * i / n, az + (bz - az) * i / n, ang]);
+      for (const y of [1.6, 3.6]) { const r = box(L, 1, 0.2, MAT.wood, (ax + bx) / 2, y, (az + bz) / 2, g); r.rotation.y = -ang; }
+    };
+    side(x0, z0, x1, z0); side(x1, z0, x1, z1); side(x0, z1, x1, z1); side(x0, z0, x0, z1);
+  }
+  const inst = new THREE.InstancedMesh(postGeo, MAT.wood, posts.length); inst.castShadow = true;
+  const d = new THREE.Object3D();
+  posts.forEach(([x, z, a], i) => { d.position.set(x, 2.5, z); d.rotation.set(0, -a, 0); d.updateMatrix(); inst.setMatrixAt(i, d.matrix); });
+  g.add(inst);
+  own('corrales', g);
+}
+// animalitos de juguete
+function makeCow() {
+  const g = new THREE.Group(), white = M('#f1eee6'), black = M('#2a2522'), pink = M('#e4a69c');
+  box(1.5, 0.75, 0.75, white, 0, 1.0, 0, g); box(0.55, 0.45, 0.77, black, -0.2, 1.1, 0, g); box(0.32, 0.3, 0.77, black, 0.42, 0.92, 0, g);
+  for (const lx of [-0.55, 0.55]) for (const lz of [-0.25, 0.25]) box(0.16, 0.66, 0.16, white, lx, 0.33, lz, g);
+  box(0.46, 0.42, 0.42, white, 0.97, 1.1, 0, g); box(0.14, 0.24, 0.36, pink, 1.24, 1.0, 0, g);
+  for (const s of [-1, 1]) box(0.06, 0.15, 0.06, M('#e8e0c6'), 0.9, 1.37, 0.15 * s, g);
+  return g;
+}
+function makeHorse(color) {
+  const g = new THREE.Group(), c = M(color), dark = M('#2e1f15');
+  box(1.6, 0.7, 0.55, c, 0, 1.38, 0, g);
+  for (const lx of [-0.6, 0.6]) for (const lz of [-0.18, 0.18]) box(0.14, 1.05, 0.14, c, lx, 0.53, lz, g);
+  const nk = box(0.3, 0.85, 0.3, c, 0.88, 1.87, 0, g); nk.rotation.z = -0.5;
+  const mn = box(0.08, 0.8, 0.1, dark, 0.74, 1.93, 0, g); mn.rotation.z = -0.5;
+  box(0.62, 0.28, 0.28, c, 1.22, 2.21, 0, g);
+  const t = box(0.1, 0.7, 0.12, dark, -0.85, 1.2, 0, g); t.rotation.z = -0.35;
+  return g;
+}
+function makePig() {
+  const g = new THREE.Group(), pink = M('#eaa3a0'), dk = M('#c97a78');
+  const b = mesh(new THREE.CapsuleGeometry(0.32, 0.55, 4, 10), pink, 0, 0.55, 0, g); b.rotation.z = Math.PI / 2;
+  for (const lx of [-0.3, 0.3]) for (const lz of [-0.16, 0.16]) box(0.12, 0.3, 0.12, pink, lx, 0.15, lz, g);
+  box(0.36, 0.36, 0.4, pink, 0.64, 0.6, 0, g);
+  const sn = cyl(0.11, 0.11, 0.08, dk, 0.85, 0.56, 0, g, 12); sn.rotation.z = Math.PI / 2;
+  return g;
+}
+{
+  part('animales', { name: 'Animalitos de juguete', anchor: V(38, 11, -16), mini: true,
+    info: { Material: 'Figuras plásticas de juguete (opcional)', Medidas: '6–8 cm de largo', Tip: 'Pégalas con un punto de silicón para que no se caigan al mover la maqueta.' } });
+  const g = new THREE.Group(); scene.add(g);
+  const place = (o, x, z, ry, s) => { o.position.set(x, 0, z); o.rotation.y = ry; o.scale.setScalar(s); g.add(o); };
+  place(makeCow(), 30, TZ('vacas') + 9.5, Math.PI * 0.62, 4.4); place(makeCow(), 40, TZ('vacas') + 6.5, Math.PI * 0.9, 4.4);
+  place(makeHorse('#7a4a2b'), 29, TZ('caballos') + 9.5, Math.PI * 0.6, 4); place(makeHorse('#3b2a20'), 41, TZ('caballos') + 7, Math.PI * 1.1, 4);
+  place(makePig(), 27, TZ('cerdos') + 8, Math.PI * 0.55, 4); place(makePig(), 35, TZ('cerdos') + 9, Math.PI * 0.75, 4); place(makePig(), 42, TZ('cerdos') + 7, Math.PI * 1.2, 4);
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  own('animales', g);
+}
+
+/* =====================================================================
+   SENSORES HC-SR04 EN PUENTES DE PALITOS
+   ===================================================================== */
+const SENSORS = {};
+function hcsr04(parent) {
+  const g = new THREE.Group(); parent.add(g);
+  box(4.5, 0.16, 2.0, MAT.pcbBlue, 0, 0, 0, g);
+  for (const s of [-1, 1]) { cyl(0.8, 0.8, 1.2, MAT.silver, s * 1.3, -0.68, 0, g, 20); cyl(0.55, 0.55, 0.02, M('#5b5f62'), s * 1.3, -1.29, 0, g, 16); }
+  box(1.0, 0.5, 0.25, MAT.black, 0, 0.3, -1.05, g);
+  const led = mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: '#163a24', emissive: '#000' }), 1.9, 0.12, 0.7, g, false);
+  return { group: g, led };
+}
+// puente: dos palitos verticales y uno horizontal; el sensor queda boca abajo y centrado
+function bridge({ id, x, z, along = 'z', span, y, footY = 0, baseY = 0, holeKey, ownerName }) {
+  const g = new THREE.Group(); scene.add(g);
+  const postH = y + 0.4 - footY;
+  const dirs = along === 'z' ? [[0, -span / 2], [0, span / 2]] : [[-span / 2, 0], [span / 2, 0]];
+  for (const [dx, dz] of dirs) { const p = box(along === 'z' ? 1 : 0.2, postH, along === 'z' ? 0.2 : 1, MAT.wood, x + dx, footY + postH / 2, z + dz, g); }
+  const bar = box(along === 'z' ? 1 : span + 1, 0.2, along === 'z' ? span + 1 : 1, MAT.wood, x, y + 0.5, z, g);
+  const s = hcsr04(g); s.group.position.set(x, y + 0.3, z); if (along === 'x') s.group.rotation.y = Math.PI / 2;
+  part('s_' + id, { name: `Sensor ${ownerName}`, anchor: V(x, y + 3.2, z), mini: true,
+    info: { Pieza: 'HC-SR04 (sensor ultrasónico)', Altura: `Transductores a ${(y - 1.3 - PARTS[id].surfaceY(1)).toFixed(1)} cm del agua cuando está lleno (mínimo 2 cm)`, Montaje: 'Pegado boca abajo bajo el palito horizontal con silicón, sin tapar los transductores', Cables: '4 hilos: VCC, TRIG, ECHO y GND. Bajan por el palito hasta el agujero de cables.' } });
+  own('s_' + id, g);
+  const hk = HOLES[holeKey], [px, pz] = dirs.reduce((b, d) => Math.hypot(x + d[0] - hk.x, z + d[1] - hk.z) < Math.hypot(x + b[0] - hk.x, z + b[1] - hk.z) ? d : b);
+  SENSORS[id] = { pos: V(x, y - 1.3, z), led: s.led, header: V(x, y + 0.55, z + Math.sign(pz || 1) * 1.05), post: V(x + px, footY, z + pz), holeKey };
+}
+bridge({ id: 'pozo', x: POZO.x, z: POZO.z, along: 'z', span: 14, y: 6.5, holeKey: 'pozoS', ownerName: 'del pozo' });
+bridge({ id: 'reserva', x: RES.x, z: RES.z, along: 'z', span: 11.4, y: RES.towerH + 0.4 + RES.h + 3.6, footY: RES.towerH + 0.4 + RES.h - 8, holeKey: 'resS', ownerName: 'del tanque de reserva' });
+bridge({ id: 'tinaco', x: CASA.x + 4, z: CASA.z - 1, along: 'z', span: 7.4, y: CASA.h + 1.4 + 11 + 3.4, footY: CASA.h + 1.4 + 11 - 5, holeKey: 'casa', ownerName: 'del tinaco' });
+for (const id in PENS) bridge({ id, x: 24, z: TZ(id), along: 'z', span: 13, y: TROUGH.r * 2 + 3.8, holeKey: id, ownerName: `del bebedero de ${PENS[id].toLowerCase()}` });
+
+/* =====================================================================
+   BOMBAS SUMERGIBLES
+   ===================================================================== */
+const PUMPS = {};
+function pumpModel(id, pos, rotY, name, from, to) {
+  const g = new THREE.Group(); g.position.copy(pos); g.rotation.y = rotY; scene.add(g);
+  box(3.8, 2.3, 2.4, MAT.pump, 0, 1.15, 0, g);
+  box(3.8, 0.3, 2.4, M('#f2f2f0'), 0, 2.45, 0, g);
+  cyl(0.38, 0.38, 1.3, MAT.pump, 1.1, 3.2, 0, g, 12);
+  for (let i = 0; i < 4; i++) box(0.12, 1.4, 0.05, M('#0e0f10'), -1.4 + i * 0.35, 0.9, 1.22, g, false);
+  part('p_' + id, { name: `Bomba ${id}`, anchor: V(pos.x, pos.y + 6, pos.z), mini: true,
+    info: { Pieza: 'Mini bomba sumergible 3–5 V (FUSUPI)', Medidas: '3.8 × 2.4 × 2.5 cm, salida para manguera de 7–8 mm', Ubicación: `En el fondo de: ${from}`, Manda: `Agua hacia: ${to}`, Cables: 'Rojo al contacto NO del relé, negro a GND' } });
+  own('p_' + id, g);
+  PUMPS[id] = { group: g, outlet: g.localToWorld(V(1.1, 3.9, 0)) };
+  g.updateMatrixWorld(true); PUMPS[id].outlet = g.localToWorld(V(1.1, 3.9, 0));
+}
+pumpModel('V0', V(-42, 0.4, -18), Math.PI / 2, 'V0', 'Red de agua', 'Pozo');
+pumpModel('B1', V(POZO.x, POZO.bottom + 0.8, POZO.z), 0, 'B1', 'Pozo', 'Tanque de reserva');
+const resBase = RES.towerH + 0.4 + 0.6;
+pumpModel('B5', V(RES.x - 2.2, resBase, RES.z - 2.2), 0, 'B5', 'Tanque de reserva', 'Tinaco de la casa');
+pumpModel('B2', V(RES.x + 2.2, resBase, RES.z - 2.2), Math.PI, 'B2', 'Tanque de reserva', 'Bebedero de vacas');
+pumpModel('B3', V(RES.x - 2.2, resBase, RES.z + 2.2), 0, 'B3', 'Tanque de reserva', 'Bebedero de caballos');
+pumpModel('B4', V(RES.x + 2.2, resBase, RES.z + 2.2), Math.PI, 'B4', 'Tanque de reserva', 'Bebedero de cerdos');
+
+/* =====================================================================
+   CAMINOS (mangueras y cables)
+   ===================================================================== */
+function roundedPath(pts, r = 0.8) {
+  const path = new THREE.CurvePath(); let prev = pts[0].clone();
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = pts[i - 1], b = pts[i], c = pts[i + 1];
+    const d1 = b.clone().sub(a), d2 = c.clone().sub(b);
+    const rr = Math.min(r, d1.length() / 2, d2.length() / 2);
+    const p1 = b.clone().sub(d1.normalize().multiplyScalar(rr)), p2 = b.clone().add(d2.normalize().multiplyScalar(rr));
+    if (p1.distanceTo(prev) > 1e-3) path.add(new THREE.LineCurve3(prev, p1));
+    path.add(new THREE.QuadraticBezierCurve3(p1, b.clone(), p2)); prev = p2;
+  }
+  path.add(new THREE.LineCurve3(prev, pts[pts.length - 1].clone()));
+  return path;
+}
+const polyLen = pts => pts.reduce((s, p, i) => i ? s + p.distanceTo(pts[i - 1]) : 0, 0);
+
+/* ---------- MANGUERAS ---------- */
+const HOSE_Y = 0.45;
+const RIM_RES = RES.towerH + 0.4 + RES.h;
+const P = (x, y, z) => V(x, y, z);
+const HOSES = {
+  V0: { to: 'pozo', label: 'Red → pozo', pts: [PUMPS.V0.outlet, P(-41.5, 18, -18), P(-40.8, RIM_SAFE(22), -17.6), P(-38.4, 23.2, -16.6), P(-37.2, 18, -16.2), P(-37.1, HOSE_Y + 0.5, -15.2), P(-37.2, HOSE_Y, -14), P(-37.2, HOSE_Y, 0.6), P(-37, 3.6, 2.2), P(-37, 3.2, 4.2), P(-37, 2.2, 5)] },
+  B1: { to: 'reserva', label: 'Pozo → tanque de reserva', pts: [PUMPS.B1.outlet, P(-32.2, -8, 8), P(-31.6, 1.8, 8), P(-31.2, 3.6, 7.6), P(-29.2, 2.6, 7), P(-28.4, HOSE_Y, 6.4), P(-22.2, HOSE_Y, 3.6), P(-21.6, 1, 3.6), P(-21.6, 14.8, 3.6), P(-20.6, 15.8, 1.6), P(-19.9, 17.5, 0.2), P(-19.9, RIM_RES - 1, -0.4), P(-19.6, RIM_RES + 1.4, -1), P(-18.2, RIM_RES + 1, -1.6), P(-17, RIM_RES - 1.5, -1.6)] },
+};
+function RIM_SAFE(y) { return y + 1.2; }
+// salidas del tanque de reserva por el lado derecho, bajan por fuera de la torre
+const RES_OUT = { B5: -5.6, B2: -3.2, B3: -0.8, B4: 1.6 };
+function fromReserve(id, rest) {
+  const zh = RES_OUT[id], o = PUMPS[id].outlet;
+  return [o, P(-10.6, RIM_RES - 6, zh), P(-9.7, RIM_RES + 1.3, zh), P(-8.3, RIM_RES + 0.9, zh), P(-7.9, RIM_RES - 2, zh), P(-6.6, RES.towerH - 0.5, zh), P(-6.4, HOSE_Y, zh), ...rest];
+}
+const troughEntry = (id, xRoute) => [P(xRoute, HOSE_Y, RES_OUT[{ vacas: 'B2', caballos: 'B3', cerdos: 'B4' }[id]]), P(xRoute, HOSE_Y, TZ(id)), P(13.6, HOSE_Y, TZ(id)), P(14.4, 6.2, TZ(id)), P(15.8, 11.2, TZ(id)), P(17.2, 10.6, TZ(id)), P(17.6, 8.6, TZ(id))];
+HOSES.B2 = { to: 'vacas', label: 'Reserva → bebedero de vacas', pts: fromReserve('B2', troughEntry('vacas', 8)) };
+HOSES.B3 = { to: 'caballos', label: 'Reserva → bebedero de caballos', pts: fromReserve('B3', troughEntry('caballos', 9.2)) };
+HOSES.B4 = { to: 'cerdos', label: 'Reserva → bebedero de cerdos', pts: fromReserve('B4', troughEntry('cerdos', 10.4)) };
+HOSES.B5 = { to: 'tinaco', label: 'Reserva → tinaco de la casa', pts: fromReserve('B5', [P(-6.4, HOSE_Y, -13.2), P(-15.4, HOSE_Y, -13.2), P(-15.4, 1, -13.2), P(-15.4, CASA.h - 0.5, -13.2), P(-16, CASA.h + 1.6, -14.6), P(-16.4, CASA.h + 1.7, -17.8), P(-16.4, CASA.h + 13.2, -20), P(-17.6, CASA.h + 13.9, -21), P(-19, CASA.h + 12, -21)]) };
+for (const id in HOSES) {
+  const h = HOSES[id];
+  h.curve = roundedPath(h.pts, 1.2);
+  h.len = h.curve.getLength();
+  const tube = mesh(new THREE.TubeGeometry(h.curve, Math.round(h.len * 3), 0.38, 8, false), MAT.hose.clone(), 0, 0, 0, scene, false);
+  tube.renderOrder = 4;
+  part('h_' + id, { name: `Manguera ${id}`, anchor: h.curve.getPointAt(0.5).add(V(0, 3, 0)), mini: true, hidden: true,
+    info: { Pieza: 'Manguera de silicón transparente (viene con las bombas)', Tramo: h.label, Largo: `${Math.round(h.len + 5)} cm (con 5 cm de holgura)`, Montaje: 'Fíjala al hielo seco cada 8–10 cm con grapas de alambre en U.', 'Anti-sifón': 'Haz un agujerito de 1 mm en la manguera, dentro del depósito y por encima del agua. Así, al apagar la bomba, el agua no sigue pasando sola.' } });
+  own('h_' + id, tube);
+  // gotas que viajan cuando la bomba está encendida
+  const N = Math.max(8, Math.round(h.len / 3.2));
+  const inst = new THREE.InstancedMesh(new THREE.SphereGeometry(0.26, 8, 6), MAT.flow, N);
+  inst.frustumCulled = false; inst.visible = false; scene.add(inst);
+  h.inst = inst; h.N = N; h.phase = Math.random();
+}
+// grapas en U sobre la plancha
+{
+  const g = new THREE.Group(); scene.add(g);
+  const clipMat = M('#9aa3a8', { metalness: 0.6, roughness: 0.4 });
+  for (const id in HOSES) {
+    const pts = HOSES[id].curve.getSpacedPoints(Math.round(HOSES[id].len / 9));
+    pts.forEach((p, i) => { if (i && p.y < 0.6) { const c = mesh(new THREE.TorusGeometry(0.55, 0.07, 6, 12, Math.PI), clipMat, p.x, 0.02, p.z, g, false); const t = HOSES[id].curve.getTangentAt(i / (pts.length - 1)); c.rotation.y = Math.atan2(t.x, t.z); } });
+  }
+}
+
+/* ---------- ELECTRÓNICA ---------- */
+const EL = { x: -4, z: 23 };
+const RELAYS = {};
+const RELAY_OF = { V0: [0, 0], B1: [0, 1], B2: [1, 0], B3: [1, 1], B4: [2, 0], B5: [2, 1] };
+const espLed = {};
+{
+  const plate = new THREE.Group(); scene.add(plate);
+  box(24, 0.3, 10, MAT.card, EL.x, 0.15, EL.z, plate);
+  part('electronica', { name: 'Zona de control', anchor: V(EL.x + 9, 6, EL.z + 4), mini: true,
+    info: { Base: 'Cartón de 24 × 10 cm pegado sobre la plancha', Contiene: 'Protoboard con ESP32 y MB102, y 3 módulos de relé de 2 canales', Cables: 'Todo lo que viene por debajo sube por el agujero de atrás.', Cuidado: 'Lejos del agua: si algo gotea, que no caiga aquí.' } });
+  own('electronica', plate);
+
+  const bb = new THREE.Group(); scene.add(bb);
+  // protoboard con textura de agujeros
+  const c = document.createElement('canvas'); c.width = 330; c.height = 110;
+  const x2 = c.getContext('2d'); x2.fillStyle = '#f5f5f0'; x2.fillRect(0, 0, 330, 110);
+  x2.fillStyle = '#c8c8c0'; for (let i = 0; i < 63; i++) for (let j = 0; j < 14; j++) { const yy = j < 2 ? 6 + j * 5 : j < 12 ? 24 + (j - 2) * 6.4 + (j >= 7 ? 4 : 0) : 92 + (j - 12) * 5; x2.fillRect(6 + i * 5.1, yy, 2, 2); }
+  x2.fillStyle = '#d33'; x2.fillRect(4, 3, 322, 1); x2.fillRect(4, 104, 322, 1); x2.fillStyle = '#36c'; x2.fillRect(4, 17, 322, 1); x2.fillRect(4, 89, 322, 1);
+  const bt = new THREE.CanvasTexture(c); bt.colorSpace = THREE.SRGBColorSpace;
+  const bbm = [M('#eeeeea'), M('#eeeeea'), new THREE.MeshStandardMaterial({ map: bt, roughness: 0.8 }), M('#eeeeea'), M('#eeeeea'), M('#eeeeea')];
+  const breadboard = new THREE.Mesh(new THREE.BoxGeometry(16.5, 0.9, 5.5), bbm); breadboard.position.set(EL.x - 1.5, 0.75, EL.z + 1.8); breadboard.castShadow = breadboard.receiveShadow = true; bb.add(breadboard);
+  part('protoboard', { name: 'Protoboard', anchor: V(EL.x - 1.5, 5, EL.z + 3), mini: true, info: { Pieza: 'Protoboard del kit MB102 (830 puntos)', Medidas: '16.5 × 5.5 cm', Uso: 'Rieles de 5 V y 3.3 V para sensores y relés; aquí llegan los TRIG/ECHO.' } });
+  own('protoboard', bb);
+
+  const esp = new THREE.Group(); esp.position.set(EL.x - 6.2, 1.25, EL.z + 1.8); scene.add(esp);
+  box(5.5, 0.16, 2.8, MAT.pcbBlack, 0, 0.35, 0, esp);
+  box(1.8, 0.32, 1.6, MAT.silver, 1.5, 0.6, 0, esp);
+  box(0.8, 0.3, 0.75, MAT.silver, -2.6, 0.55, 0, esp);
+  for (const s of [-1, 1]) box(4.8, 0.35, 0.25, MAT.black, 0, 0.1, s * 1.25, esp);
+  espLed.m = mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: '#0f2b3c', emissive: '#000' }), -1.6, 0.5, 0.9, esp, false);
+  part('esp32', { name: 'ESP32', anchor: V(EL.x - 6.2, 5.5, EL.z + 1.8), info: { Pieza: 'ESP32 DevKit', Medidas: '5.5 × 2.8 cm', Función: 'Lee los 6 HC-SR04, enciende las bombas con los relés y manda los datos por WiFi a la app.', Alimentación: 'Por USB o desde el riel de 5 V al pin VIN (no ambos a la vez).' } });
+  own('esp32', esp);
+
+  const mb = new THREE.Group(); mb.position.set(EL.x + 5.2, 1.25, EL.z + 1.8); scene.add(mb);
+  box(3.4, 0.16, 5.3, M('#1d3b28'), 0, 0.35, 0, mb);
+  box(1.1, 1.1, 1.4, MAT.black, 0.8, 0.95, -1.9, mb);
+  box(0.6, 0.5, 0.9, MAT.silver, -0.9, 0.7, -2.1, mb);
+  for (const s of [-1, 1]) box(0.25, 0.5, 0.5, M('#e5c330'), s * 1.1, 0.7, 1.3, mb);
+  part('mb102', { name: 'MB102', anchor: V(EL.x + 5.2, 5, EL.z + 1.8), mini: true, info: { Pieza: 'Módulo de alimentación MB102', Entrada: 'Adaptador de 9–12 V (plug) o USB', Salida: '5 V para relés y bombas, 3.3 V para los sensores', Tip: 'Con varias bombas encendidas, usa el adaptador, no el USB.' } });
+  own('mb102', mb);
+  // cable del adaptador hasta el borde de la plancha
+  const pw = roundedPath([V(EL.x + 6, 2.3, EL.z - 0.3), V(EL.x + 6.5, 1.5, EL.z - 1.6), V(EL.x + 10, 0.6, EL.z - 1.6), V(EL.x + 12, 0.5, 29), V(EL.x + 12, -1.5, 30.6), V(EL.x + 12, TABLE_Y + 0.4, 34)], 1);
+  own('mb102', mesh(new THREE.TubeGeometry(pw, 60, 0.22, 6, false), MAT.black, 0, 0, 0, scene));
+
+  const rg = new THREE.Group(); scene.add(rg);
+  [-11, -4, 3].forEach((mx, m) => {
+    const g = new THREE.Group(); g.position.set(EL.x + mx + 4, 0.3, EL.z - 3); rg.add(g);
+    box(5.0, 0.16, 3.8, MAT.pcbBlue, 0, 0.1, 0, g);
+    for (let j = 0; j < 2; j++) {
+      const xx = -1.2 + j * 2.4;
+      box(1.9, 1.5, 1.5, MAT.relayCube, xx, 0.95, 0.3, g);
+      box(1.9, 0.9, 0.9, M('#1e4fa8'), xx, 0.6, -1.4, g);
+      const led = mesh(new THREE.SphereGeometry(0.13, 8, 8), new THREE.MeshStandardMaterial({ color: '#3a1512', emissive: '#000' }), xx, 0.3, 1.55, g, false);
+      const id = Object.keys(RELAY_OF).find(k => RELAY_OF[k][0] === m && RELAY_OF[k][1] === j);
+      RELAYS[id] = { led, term: g.localToWorld(V(xx, 0.9, -1.9)) };
+    }
+    box(1.4, 0.5, 0.3, MAT.black, 0, 0.35, 1.75, g);
+  });
+  rg.updateMatrixWorld(true);
+  for (const id in RELAYS) { const r = RELAYS[id]; const g = r.led.parent; r.term = g.localToWorld(V(-1.2 + RELAY_OF[id][1] * 2.4, 0.9, -1.9)); r.inPin = g.localToWorld(V(0, 0.6, 1.75)); }
+  part('reles', { name: 'Relés (3 × 2 canales)', anchor: V(EL.x + 4, 5.5, EL.z - 3), mini: true,
+    info: { Pieza: '3 módulos de relé de 2 canales con optoacoplador', Canales: 'Módulo 1: V0 y B1 · Módulo 2: B2 y B3 · Módulo 3: B4 y B5', Conexión: 'IN1/IN2 a los GPIO del ESP32; COM al riel de 5 V; NO al cable rojo de la bomba.', Nota: 'El LED de cada canal se enciende cuando su bomba trabaja.' } });
+  own('reles', rg);
+  // jumpers ESP32 → entradas de los relés (cortos, sobre el cartón)
+  const jg = new THREE.Group(); scene.add(jg);
+  const jcol = ['#3d8bfd', '#9b59b6', '#e67e22', '#1abc9c', '#e84393', '#f1c40f'];
+  Object.keys(RELAYS).forEach((id, i) => {
+    const a = V(EL.x - 7.8 + i * 0.6, 1.9, EL.z + 0.6), b = RELAYS[id].inPin.clone();
+    const mid = a.clone().lerp(b, 0.5); mid.y += 2.2;
+    const cu = new THREE.QuadraticBezierCurve3(a, mid, b);
+    mesh(new THREE.TubeGeometry(cu, 20, 0.09, 5, false), M(jcol[i]), 0, 0, 0, jg, false);
+  });
+  own('reles', jg);
+}
+
+/* ---------- CABLES (arriba, por el agujero, por debajo y de regreso) ---------- */
+const WIRE = { vcc: '#e5483d', gnd: '#2a2a2a', trig: '#f2c230', echo: '#3fb36b', pump: '#e5483d' };
+const SENSOR_PINS = { pozo: [4, 34], reserva: [5, 35], tinaco: [18, 36], vacas: [19, 39], caballos: [21, 16], cerdos: [22, 17] };
+const RELAY_PINS = { V0: 23, B1: 25, B2: 26, B3: 27, B4: 32, B5: 33 };
+const CABLES = [];
+const E = HOLES.E;
+let runIdx = 0;
+function addRun({ id, label, to, colors, above, hole, endPt, pins }) {
+  const k = runIdx++;
+  const yU = -BOARD.t - 0.25 - k * 0.32;
+  // por debajo: baja por el agujero, va en X hasta el agujero de control y luego en Z
+  const under = [V(hole.x, 0.3, hole.z), V(hole.x, yU, hole.z), V(E.x + (k - 6) * 0.25, yU, hole.z), V(E.x + (k - 6) * 0.25, yU, E.z), V(E.x + (k - 6) * 0.25, 0.4, E.z)];
+  const tail = [V(E.x + (k - 6) * 0.25, 1.6, E.z + 0.6), ...(endPt.z > 21 ? [V(endPt.x, 4.2, 21.6)] : []), endPt];
+  const pts = [...above, ...under, ...tail];
+  const len = polyLen(pts);
+  const g = new THREE.Group(); scene.add(g);
+  colors.forEach((c, i) => {
+    const o = (i - (colors.length - 1) / 2) * 0.24;
+    const off = pts.map((p, j) => j === pts.length - 1 ? p.clone().add(V(o, 0, 0)) : p.clone().add(V(o, 0, o)));
+    const cu = roundedPath(off, 0.7);
+    mesh(new THREE.TubeGeometry(cu, Math.round(cu.getLength() * 2.5), 0.11, 5, false), M(c, { roughness: 0.5 }), 0, 0, 0, g, false);
+  });
+  part('c_' + id, { name: `Cable ${label}`, anchor: V(hole.x, -BOARD.t - 2, hole.z), mini: true, hidden: true,
+    info: { Desde: label, Hacia: to, Hilos: colors.length === 4 ? 'VCC (rojo), GND (negro), TRIG (amarillo), ECHO (verde)' : 'Rojo (relé NO) y negro (GND)', Pines: pins, Largo: `${Math.round(len + 10)} cm (con 10 cm de holgura)`, Recorrido: 'Sale por el agujero junto a la pieza, va pegado por debajo de la plancha con cinta y sube por el agujero de la zona de control.' } });
+  own('c_' + id, g);
+  CABLES.push({ id, label, to, pins, len: len + 10, colors });
+}
+// recorridos sobre la plancha desde cada sensor hasta su agujero
+const sAbove = id => { const s = SENSORS[id], h = HOLES[s.holeKey]; return [s.header, V(s.header.x, s.header.y + 0.4, s.post.z - 0.4), V(s.post.x + 0.5, s.header.y, s.post.z), V(s.post.x + 0.5, s.post.y + 0.6, s.post.z)]; };
+const sensorColors = [WIRE.vcc, WIRE.gnd, WIRE.trig, WIRE.echo];
+let bbSlot = 0;
+const bbPt = () => V(EL.x - 3.2 + (bbSlot++) * 1.3, 1.35, EL.z + 3.6);
+addRun({ id: 'pozo', label: 'Sensor del pozo', to: 'Protoboard', colors: sensorColors, hole: HOLES.pozoS, endPt: bbPt(), pins: `TRIG ${SENSOR_PINS.pozo[0]} · ECHO ${SENSOR_PINS.pozo[1]}`,
+  above: [...sAbove('pozo'), V(HOLES.pozoS.x, 0.5, HOLES.pozoS.z)] });
+addRun({ id: 'reserva', label: 'Sensor del tanque', to: 'Protoboard', colors: sensorColors, hole: HOLES.resS, endPt: bbPt(), pins: `TRIG ${SENSOR_PINS.reserva[0]} · ECHO ${SENSOR_PINS.reserva[1]}`,
+  above: [...sAbove('reserva'), V(RES.x + 0.6, RIM_RES - 8, RES.z - 5.6), V(RES.x + 5.3, RES.towerH + 0.6, RES.z - 5.8), V(RES.x + 5.8, RES.towerH - 1, RES.z - 5.8), V(RES.x + 5.8, 1, RES.z - 5.8), V(HOLES.resS.x, 0.5, HOLES.resS.z)] });
+addRun({ id: 'tinaco', label: 'Sensor del tinaco', to: 'Protoboard', colors: sensorColors, hole: HOLES.casa, endPt: bbPt(), pins: `TRIG ${SENSOR_PINS.tinaco[0]} · ECHO ${SENSOR_PINS.tinaco[1]}`,
+  above: [...sAbove('tinaco'), V(CASA.x + 4, CASA.h + 1.2, CASA.z - 5), V(CASA.x + 7.8, CASA.h + 0.6, CASA.z - 6.2), V(CASA.x + 8.3, CASA.h, CASA.z - 6.3), V(CASA.x + 8.3, 0.5, CASA.z - 6.3), V(HOLES.casa.x, 0.5, HOLES.casa.z)] });
+for (const id in PENS) addRun({ id, label: `Sensor de ${PENS[id].toLowerCase()}`, to: 'Protoboard', colors: sensorColors, hole: HOLES[id], endPt: bbPt(), pins: `TRIG ${SENSOR_PINS[id][0]} · ECHO ${SENSOR_PINS[id][1]}`,
+  above: [...sAbove(id), V(HOLES[id].x, 0.5, HOLES[id].z)] });
+// bombas: los dos hilos salen por el borde del depósito
+const pumpColors = [WIRE.pump, WIRE.gnd];
+addRun({ id: 'V0', label: 'Bomba V0', to: 'Relé 1 · CH1', colors: pumpColors, hole: HOLES.red, endPt: RELAYS.V0.term, pins: `IN1 ← GPIO ${RELAY_PINS.V0}`,
+  above: [PUMPS.V0.group.position.clone().add(V(0, 2.4, 1)), V(-41, 21, -14.6), V(-41, 23, -14.2), V(-40, 21, -13.8), V(-38.6, 6, -14.6), V(-37.4, 0.5, -15.4), V(HOLES.red.x, 0.5, HOLES.red.z)] });
+addRun({ id: 'B1', label: 'Bomba B1', to: 'Relé 1 · CH2', colors: pumpColors, hole: HOLES.pozoB, endPt: RELAYS.B1.term, pins: `IN2 ← GPIO ${RELAY_PINS.B1}`,
+  above: [PUMPS.B1.group.position.clone().add(V(-1, 2.4, 1)), V(-33.4, -4, 11.4), V(-33, 2.8, 11.8), V(-32.4, 3.6, 12.2), V(-31.6, 1.6, 12.8), V(HOLES.pozoB.x, 0.5, HOLES.pozoB.z)] });
+for (const id of ['B2', 'B3', 'B4', 'B5']) {
+  const pp = PUMPS[id].group.position, zw = RES.z + 3.6 + ['B5', 'B2', 'B3', 'B4'].indexOf(id) * 0.5;
+  addRun({ id, label: `Bomba ${id}`, to: { B2: 'Relé 2 · CH1', B3: 'Relé 2 · CH2', B4: 'Relé 3 · CH1', B5: 'Relé 3 · CH2' }[id], colors: pumpColors, hole: HOLES.resB, endPt: RELAYS[id].term,
+    pins: `${{ B2: 'IN1', B3: 'IN2', B4: 'IN1', B5: 'IN2' }[id]} ← GPIO ${RELAY_PINS[id]}`,
+    above: [pp.clone().add(V(0, 2.4, 0)), V(RES.x + 3, RIM_RES - 4, zw), V(RES.x + 4.6, RIM_RES + 1, zw), V(RES.x + 6, RIM_RES - 1, zw), V(RES.x + 5.6, RES.towerH + 0.6, RES.z + 5.8), V(RES.x + 5.8, RES.towerH - 1, RES.z + 5.8), V(RES.x + 5.8, 1, RES.z + 5.8), V(HOLES.resB.x, 0.5, HOLES.resB.z)] });
+}
+
+/* =====================================================================
+   ETIQUETAS
+   ===================================================================== */
+const labelsEl = $('#labels');
+const _v = new THREE.Vector3();
+for (const id in PARTS) {
+  const p = PARTS[id]; if (p.hidden) continue;
+  const el = document.createElement('div'); el.className = 'tag'; labelsEl.appendChild(el);
+  el.addEventListener('click', () => selectPart(id));
+  p.label = el;
+}
+function placeLabels() {
+  const w = window.innerWidth, h = window.innerHeight, mobile = w <= 760;
+  const below = camera.position.y < -BOARD.t;   // desde abajo, las etiquetas de arriba confunden
+  for (const id in PARTS) {
+    const p = PARTS[id]; if (!p.label) continue;
+    const near = camera.position.distanceTo(p.anchor) < (mobile ? 45 : 75);
+    const show = !p.mini || p.hl || near;
+    _v.copy(p.anchor).project(camera);
+    const vis = show && !below && _v.z < 1 && Math.abs(_v.x) < 1.15 && Math.abs(_v.y) < 1.15;
+    p.label.style.display = vis ? '' : 'none';
+    if (vis) p.label.style.transform = `translate(${((_v.x + 1) / 2 * w).toFixed(1)}px,${((1 - _v.y) / 2 * h).toFixed(1)}px) translate(-50%,calc(-100% - 6px))`;
+  }
+}
+function labelText() {
+  for (const id in PARTS) {
+    const p = PARTS[id]; if (!p.label) continue;
+    const lv = LEVELS[id] !== undefined ? `<span class="m">${Math.round(LEVELS[id] * 100)}%</span>` : '';
+    const pm = id.startsWith('p_') && ON[id.slice(2)] ? '<span class="m">encendida</span>' : '';
+    const html = `<b>${p.name}</b>${lv}${pm}`;
+    if (p.label._h !== html) { p.label.innerHTML = html; p.label._h = html; }
+    p.label.classList.toggle('hl', !!p.hl);
+  }
+}
+
+/* =====================================================================
+   AGUA EN MOVIMIENTO (velocidad real: ~22 ml/s por bomba)
+   ===================================================================== */
+const CAP = { pozo: 1250, reserva: 1650, tinaco: 330, vacas: 650, caballos: 650, cerdos: 650 };
+const LEVELS = { pozo: 0.6, reserva: 0.55, tinaco: 0.5, vacas: 0.72, caballos: 0.46, cerdos: 0.33 };
+const USE = { tinaco: 2.2, vacas: 4.5, caballos: 3.8, cerdos: 3.2 };
+const FLOW = 22, LOW = 0.3, HIGH = 0.9;
+const ON = { V0: false, B1: false, B2: false, B3: false, B4: false, B5: false };
+const SRC = { V0: null, B1: 'pozo', B2: 'reserva', B3: 'reserva', B4: 'reserva', B5: 'reserva' };
+let speed = 1;
+function waterStep(dt) {
+  for (const id in USE) LEVELS[id] = Math.max(0, LEVELS[id] - USE[id] * dt / CAP[id]);
+  for (const id in ON) {
+    const dst = HOSES[id].to, src = SRC[id];
+    if (!ON[id] && LEVELS[dst] <= LOW && (!src || LEVELS[src] > 0.15)) ON[id] = true;
+    if (ON[id] && (LEVELS[dst] >= HIGH || (src && LEVELS[src] <= 0.08))) ON[id] = false;
+    if (ON[id]) {
+      let ml = FLOW * dt;
+      if (src) { ml = Math.min(ml, LEVELS[src] * CAP[src]); LEVELS[src] -= ml / CAP[src]; }
+      LEVELS[dst] = Math.min(1, LEVELS[dst] + ml / CAP[dst]);
+    }
+  }
+}
+
+/* =====================================================================
+   PANEL: pasos, pieza, materiales y cables
+   ===================================================================== */
+const STEPS = [
+  { t: 'Base y soportes', parts: ['base', 'soportes'], view: [V(70, 30, 95), V(0, -6, 0)],
+    b: 'Usa una plancha de hielo seco de 100 × 60 cm y 2.5 cm de grosor. Pega 4 soportes de 15 cm en las esquinas. Debajo queda el espacio para los cables y para el fondo del pozo.',
+    tip: 'Si la plancha se dobla, pega un quinto soporte en el centro.' },
+  { t: 'Marcar y perforar', parts: ['base'], view: [V(0, 120, 40), V(-4, 0, 0)],
+    b: 'Con marcador, dibuja dónde va cada pieza. Abre el hueco del pozo (Ø 11 cm) con un cúter y los 10 agujeros de cables (Ø 1 cm) con un destornillador caliente o un lápiz.',
+    tip: 'Perfora antes de pegar las piezas: después ya no hay espacio para trabajar.' },
+  { t: 'Pozo', parts: ['pozo', 's_pozo', 'p_B1'], view: [V(-14, 22, 40), V(-36, -3, 8)],
+    b: 'Corta una botella de 2 L a 16 cm de la base y métela en el hueco: sobresalen 2 cm arriba y cuelgan 14 cm por debajo. Sella el borde con silicón y pega piedritas alrededor como brocal.' },
+  { t: 'Red de agua', parts: ['red', 'p_V0'], view: [V(-20, 30, 10), V(-42, 8, -18)],
+    b: 'Corta una botella de 1.5 L a 22 cm. Representa el agua de la calle que llena el pozo. Adentro, en el fondo, va la bomba V0.' },
+  { t: 'Torre y tanque de reserva', parts: ['torre', 'reserva'], view: [V(16, 40, 40), V(-14, 18, -2)],
+    b: 'Clava 4 palitos de brocheta de 14 cm en el hielo seco y amárralos con palitos de helado en X. Arriba pega una plataforma de cartón de 14 × 14 cm y sobre ella una botella de 2 L cortada a 22 cm.',
+    tip: 'Llena pesa casi 2 kg: pega bien la botella a la plataforma y la plataforma a las brochetas.' },
+  { t: 'Casa y tinaco', parts: ['casa', 'tinaco'], view: [V(0, 34, 14), V(-24, 10, -20)],
+    b: 'Una caja de cartón de 16 × 12 × 11 cm con puerta y ventanas pintadas. En el techo, sobre una base de cartón, va una botella de 500 ml cortada a 11 cm.' },
+  { t: 'Bebederos y corrales', parts: ['vacas', 'caballos', 'cerdos', 'corrales', 'animales'], view: [V(62, 50, 46), V(28, 2, 0)],
+    b: 'Corta 3 botellas de 2 L a lo largo, por la mitad. Deja la tapa puesta para que no se salga el agua. Fíjalas con 4 palillos y silicón. Haz las cercas con palitos de helado.',
+    tip: 'Antes de fijarlas, llénalas con agua sobre un plato para confirmar que la tapa no gotea.' },
+  { t: 'Sensores HC-SR04', parts: ['s_pozo', 's_reserva', 's_tinaco', 's_vacas', 's_caballos', 's_cerdos'], view: [V(30, 40, 40), V(4, 8, -2)],
+    b: 'Cada sensor va boca abajo, pegado bajo un puente de palitos de helado, al menos 3 cm sobre el borde. Los dos "ojos" deben apuntar derecho al agua.',
+    tip: 'El HC-SR04 no mide menos de 2 cm. Si queda muy cerca del agua, marca lecturas falsas.' },
+  { t: 'Bombas y mangueras', parts: ['p_V0', 'p_B1', 'p_B2', 'p_B3', 'p_B4', 'p_B5', 'h_V0', 'h_B1', 'h_B2', 'h_B3', 'h_B4', 'h_B5'], view: [V(24, 60, 62), V(-10, 6, -2)],
+    b: 'Cada bomba va en el fondo del depósito de donde saca agua: V0 en la red, B1 en el pozo y B2–B5 en el tanque de reserva. Corta la manguera a la medida (pestaña Materiales), pásala por encima del borde y fíjala con grapas de alambre en U.',
+    tip: 'Anti-sifón: haz un agujerito de 1 mm en cada manguera, dentro del depósito y por encima del agua. Si no, cuando la bomba se apaga el agua sigue bajando sola del tanque alto a los bebederos.' },
+  { t: 'Cables por debajo', parts: [], view: 'under',
+    b: 'Pasa los cables por el agujero junto a cada pieza, pégalos por debajo de la plancha con cinta de enmascarar y llévalos hasta el agujero de la zona de control.',
+    tip: 'Marca cada cable en las dos puntas con cinta y un nombre (ej. "Vacas TRIG"). Ahorra mucho tiempo al conectar.' },
+  { t: 'Electrónica', parts: ['electronica', 'protoboard', 'esp32', 'mb102', 'reles'], view: 'elec',
+    b: 'Sobre un cartón de 24 × 10 cm: la protoboard con el ESP32 y el MB102, y los 3 módulos de relé. Conecta según la pestaña Cables.',
+    tip: 'Las bombas toman la corriente del riel de 5 V a través del relé, nunca de un pin del ESP32.' },
+  { t: 'Prueba con agua', parts: ['pozo', 'reserva', 'tinaco', 'vacas', 'caballos', 'cerdos', 'red'], view: 'home',
+    b: 'Prueba cada bomba por separado con su depósito sobre una bandeja. Cuando no gotee nada, pon el agua en la maqueta y deja que el ESP32 controle todo.',
+    tip: 'La maqueta que ves aquí ya está funcionando: mira cómo bajan los bebederos y cómo se encienden las bombas solas.' },
+];
+let curStep = -1;
+$('#steps').innerHTML = STEPS.map((s, i) => `<li><button class="step" aria-expanded="false" data-i="${i}"><span class="n">${i + 1}</span><b>${s.t}</b><span class="body">${s.b}${s.tip ? `<span class="tip">${s.tip}</span>` : ''}</span></button></li>`).join('');
+$('#steps').addEventListener('click', e => { const b = e.target.closest('.step'); if (b) goStep(+b.dataset.i); });
+$('#prevStep').addEventListener('click', () => goStep(Math.max(0, curStep - 1)));
+$('#nextStep').addEventListener('click', () => goStep(Math.min(STEPS.length - 1, curStep + 1)));
+function goStep(i) {
+  curStep = i;
+  document.querySelectorAll('.step').forEach((b, j) => b.setAttribute('aria-expanded', String(j === i)));
+  const s = STEPS[i];
+  highlight(s.parts);
+  if (s.view !== 'under') setXray(false);
+  if (s.view === 'under') viewUnder(); else if (s.view === 'elec') viewElec(); else if (s.view === 'home') viewHome(false);
+  else flyTo(s.view[0], s.view[1]);
+  const el = document.querySelector(`.step[data-i="${i}"]`); el && el.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+}
+
+let hlSet = new Set();
+function highlight(ids) {
+  for (const id in PARTS) PARTS[id].hl = false;
+  hlSet = new Set(ids);
+  ids.forEach(id => { if (PARTS[id]) PARTS[id].hl = true; });
+}
+function applyHighlight(t) {
+  const k = 0.25 + 0.15 * Math.sin(t * 4);
+  for (const id in PARTS) {
+    const on = hlSet.has(id);
+    for (const m of PARTS[id].meshes) {
+      if (!m.material.emissive || m.userData.shared) continue;
+      if (on) { m.material.emissive.set('#2f8fe0'); m.material.emissiveIntensity = k; }
+      else if (m.material.emissiveIntensity !== 0 && !m.userData.keepEmissive) { m.material.emissive.set('#000'); m.material.emissiveIntensity = 0; }
+    }
+  }
+}
+
+function selectPart(id) {
+  const p = PARTS[id]; if (!p) return;
+  highlight([id]);
+  showView('pieza');
+  const rows = Object.entries(p.info || {}).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  const lvl = LEVELS[id] !== undefined ? `<div class="level"><i id="pieceLvl" style="width:${LEVELS[id] * 100}%"></i></div><p class="hint" id="pieceLvlTxt" style="margin-top:4px">Nivel ahora: ${Math.round(LEVELS[id] * 100)}%</p>` : '';
+  $('#pieceCard').innerHTML = `<h3>${p.name}</h3>${lvl}<dl class="kv">${rows}</dl>`;
+  $('#pieceCard').dataset.part = id;
+}
+
+// materiales
+const hoseTotal = Object.values(HOSES).reduce((s, h) => s + h.len + 5, 0);
+const cableUnder = CABLES.reduce((s, c) => s + c.len, 0);
+$('#totHose').textContent = meters(hoseTotal);
+$('#totCable').textContent = meters(cableUnder);
+const BOM = [
+  ['Plancha de hielo seco 100 × 60 × 2.5 cm', '1', 'Base de la maqueta', 'get'],
+  ['Soportes de 15 cm (bloques, vasos o cajitas)', '4', 'Elevar la plancha', 'get'],
+  ['Botella PET de 2 L', '5', 'Pozo, tanque de reserva y 3 bebederos', 'get'],
+  ['Botella PET de 1.5 L', '1', 'Red de agua', 'get'],
+  ['Botella PET de 500 ml', '1', 'Tinaco de la casa', 'get'],
+  ['Caja de cartón y cartón extra', '1', 'Casa, plataforma de la torre y base de la electrónica', 'get'],
+  ['Palitos de helado', '≈ 70', 'Puentes de sensores, torre y cercas', 'buy'],
+  ['Palitos de brocheta', '4', 'Patas de la torre', 'buy'],
+  ['Palillos de dientes', '12', 'Fijar los bebederos', 'get'],
+  ['Silicón caliente (pistola y barras)', '1', 'Pegar todo', 'buy'],
+  ['Cinta de enmascarar', '1', 'Sujetar cables por debajo y marcarlos', 'buy'],
+  ['Alambre delgado', '1 m', 'Grapas en U para las mangueras', 'buy'],
+  ['Piedritas y animalitos de juguete', '—', 'Decoración (opcional)', 'get'],
+  ['ESP32', '1', 'Control y WiFi', 'have'],
+  ['Sensor HC-SR04', '6', 'Uno por depósito (tienen 3 o 5: completen 6)', 'buy'],
+  ['Módulo de relé de 2 canales', '3', '6 canales para V0 y B1–B5 (revisen cuántos tienen)', 'buy'],
+  ['Mini bomba sumergible 3–5 V', '6', 'V0 y B1–B5 (tienen 4: faltan 2)', 'buy'],
+  ['Manguera de silicón', meters(hoseTotal), `Vienen 2 m con las bombas: faltan ≈ ${meters(Math.max(0, hoseTotal - 200))}`, hoseTotal > 200 ? 'buy' : 'have'],
+  ['Cable UTP (cable de red)', meters(cableUnder), 'Un tramo por sensor y por bomba (usan 4 o 2 de sus 8 hilos)', 'buy'],
+  ['MB102 y adaptador de 9–12 V', '1', 'Alimentación de relés y bombas', 'have'],
+  ['Jumpers Dupont', '60', 'Conexiones en la protoboard', 'have'],
+];
+const stateTxt = { have: 'Lo tienen', buy: 'Comprar', get: 'Conseguir' };
+$('#bom').innerHTML = BOM.map(([a, b, c, s]) => `<tr><td>${a}<br><span class="chip ${s}" style="margin-top:4px">${stateTxt[s]}</span></td><td class="num">${b}</td><td>${c}</td></tr>`).join('');
+$('#hoseTable').innerHTML = Object.entries(HOSES).map(([id, h]) => `<tr class="row-click" data-part="h_${id}"><td class="num">${id}</td><td>${h.label}</td><td class="num">${Math.round(h.len + 5)} cm</td></tr>`).join('');
+$('#cableTable').innerHTML = CABLES.map(c => `<tr class="row-click" data-part="c_${c.id}"><td>${c.label}</td><td>${c.to}</td><td class="num">${c.pins}</td><td class="num">${Math.round(c.len)} cm</td></tr>`).join('');
+document.querySelectorAll('tr.row-click').forEach(tr => tr.addEventListener('click', () => {
+  const id = tr.dataset.part; highlight([id]);
+  if (id.startsWith('c_')) viewUnder(); else focusOn(PARTS[id].anchor, 40);
+}));
+
+/* ---------- pestañas y panel ---------- */
+let currentView = 'armado';
+function showView(v) {
+  if (v !== currentView) $('#panel .views').scrollTop = 0;
+  currentView = v;
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === v)));
+  document.querySelectorAll('.view').forEach(s => s.hidden = s.id !== 'view-' + v);
+  openPanel(true);
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showView(t.dataset.view)));
+function openPanel(open) {
+  $('#panel').classList.toggle('collapsed', !open);
+  const b = $('#collapseBtn'), t = open ? 'Minimizar panel' : 'Abrir panel';
+  b.setAttribute('aria-expanded', String(open)); b.setAttribute('aria-label', t); b.title = t;
+  if (typeof updateViewOffset === 'function') updateViewOffset();
+}
+$('#collapseBtn').addEventListener('click', () => openPanel($('#panel').classList.contains('collapsed')));
+function setClean(on) {
+  document.body.classList.toggle('clean', on);
+  const b = $('#hideBtn'); b.setAttribute('aria-pressed', String(on)); b.querySelector('.t').textContent = on ? 'Mostrar panel' : 'Ocultar panel';
+  updateViewOffset();
+}
+$('#hideBtn').addEventListener('click', () => setClean(!document.body.classList.contains('clean')));
+window.addEventListener('keydown', e => { if (!e.target.closest('input') && !e.ctrlKey && !e.metaKey && (e.key === 'h' || e.key === 'H')) setClean(!document.body.classList.contains('clean')); });
+
+/* ---------- vistas de cámara ---------- */
+let fly = null;
+function flyTo(pos, target) {
+  if (reduceMotion) { camera.position.copy(pos); controls.target.copy(target); return; }
+  fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos.clone(), t1: target.clone(), k: 0 };
+}
+function focusOn(target, dist) {
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  if (dir.y < 0.3) { dir.y = 0.3; dir.normalize(); }
+  flyTo(target.clone().addScaledVector(dir, dist), target);
+}
+const boardMats = () => [...PARTS.base.meshes, ...PARTS.soportes.meshes].map(m => m.material);
+function setXray(on) {
+  boardMats().forEach(m => { m.transparent = on; m.opacity = on ? 0.22 : 1; m.depthWrite = !on; m.needsUpdate = true; });
+  $('#xray').setAttribute('aria-pressed', String(on));
+}
+function viewHome(clearHl = true) { if (clearHl) highlight([]); flyTo(mobile() ? V(-50, 150, 178) : HOME.pos, mobile() ? V(-6, 0, -1) : HOME.target); }
+function viewUnder() { flyTo(V(-20, -62, 70), V(-4, -5, 0)); }
+function viewElec() { flyTo(V(EL.x + 6, 26, EL.z + 26), V(EL.x, 1, EL.z - 1)); }
+const mobile = () => window.innerWidth <= 760;
+$('#vHome').addEventListener('click', () => viewHome());
+$('#vUnder').addEventListener('click', viewUnder);
+$('#vElec').addEventListener('click', viewElec);
+$('#xray').addEventListener('click', () => setXray($('#xray').getAttribute('aria-pressed') !== 'true'));
+$('#lblBtn').addEventListener('click', () => { const on = !document.body.classList.toggle('nolabels'); $('#lblBtn').setAttribute('aria-pressed', String(on)); });
+$('#speedSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; speed = +b.dataset.speed; $('#speedSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
+
+/* ---------- clic en la escena ---------- */
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+let downAt = null;
+canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+  const id = pick(e); if (id) selectPart(id);
+});
+let hoverT = 0;
+canvas.addEventListener('pointermove', e => { if (e.buttons || performance.now() - hoverT < 80) return; hoverT = performance.now(); canvas.style.cursor = pick(e) ? 'pointer' : ''; });
+function pick(e) {
+  const r = canvas.getBoundingClientRect();
+  ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects(clickables, false);
+  // las mangueras y cables son delgados: si el rayo los toca, tienen prioridad
+  const thin = hits.find(h => /^(h_|c_|s_|p_)/.test(h.object.userData.part) && h.distance < (hits[0]?.distance ?? 0) + 3);
+  return (thin || hits[0])?.object.userData.part || null;
+}
+
+/* =====================================================================
+   BUCLE
+   ===================================================================== */
+function updateViewOffset() {
+  const w = window.innerWidth, h = window.innerHeight, pn = $('#panel');
+  const visible = !document.body.classList.contains('clean') && !pn.classList.contains('collapsed');
+  const top = $('#topbar').offsetHeight;
+  let sx = 0, sy = -top / 2;
+  if (visible && w > 760) sx = (pn.offsetWidth + 12) / 2;
+  if (visible && w <= 760) sy = pn.offsetHeight / 2 - top / 2;
+  camera.setViewOffset(w, h, -sx, sy, w, h);
+}
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w <= 760 ? 52 : 42; camera.updateProjectionMatrix();
+  document.documentElement.style.setProperty('--topbar-h', $('#topbar').offsetHeight + 'px');
+  updateViewOffset();
+}
+window.addEventListener('resize', resize); resize();
+if (mobile()) { camera.position.set(-50, 150, 178); controls.target.set(-6, 0, -1); openPanel(false); }
+
+const pings = Object.keys(SENSORS).map(id => {
+  const ring = mesh(new THREE.RingGeometry(0.4, 0.6, 28), new THREE.MeshBasicMaterial({ color: '#7fe0ff', transparent: true, depthWrite: false, side: THREE.DoubleSide }), 0, 0, 0, scene, false);
+  ring.rotation.x = -Math.PI / 2; return { id, ring, ph: Math.random() };
+});
+const dummy = new THREE.Object3D(), tmp = new THREE.Vector3();
+let last = performance.now(), lastUi = 0;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now; const t = now / 1000;
+  if (speed > 0) waterStep(dt * speed);
+  for (const id in LEVELS) PARTS[id].setLevel(LEVELS[id]);
+  PARTS.red.setLevel(PARTS.red.fixed);
+  // mangueras con agua
+  for (const id in HOSES) {
+    const h = HOSES[id]; h.inst.visible = ON[id] && speed > 0;
+    if (!h.inst.visible) continue;
+    h.phase = (h.phase + dt * 14 * speed / h.len) % 1;
+    for (let i = 0; i < h.N; i++) { h.curve.getPointAt(((i / h.N) + h.phase) % 1, tmp); dummy.position.copy(tmp); dummy.updateMatrix(); h.inst.setMatrixAt(i, dummy.matrix); }
+    h.inst.instanceMatrix.needsUpdate = true;
+  }
+  // LEDs de relés, bombas que vibran, ESP32
+  for (const id in ON) {
+    const r = RELAYS[id]; r.led.material.emissive.set(ON[id] ? '#ff3b2f' : '#000'); r.led.material.emissiveIntensity = 1.5; r.led.userData.keepEmissive = true;
+    PUMPS[id].group.children[0].position.x = ON[id] ? Math.sin(t * 80) * 0.03 : 0;
+  }
+  espLed.m.material.emissive.set(Math.sin(t * 4) > 0 ? '#3aa6ff' : '#000'); espLed.m.material.emissiveIntensity = 1.4; espLed.m.userData.keepEmissive = true;
+  // pulsos ultrasónicos
+  for (const p of pings) {
+    const s = SENSORS[p.id]; p.ph = (p.ph + dt * 0.8) % 1;
+    const yWorld = PARTS[p.id].surfaceY(LEVELS[p.id]);
+    p.ring.visible = !reduceMotion;
+    p.ring.position.set(s.pos.x, s.pos.y + (yWorld - s.pos.y) * p.ph + 0.05, s.pos.z);
+    const sc = 1 + p.ph * 2.2; p.ring.scale.set(sc, sc, sc); p.ring.material.opacity = 0.8 * (1 - p.ph);
+    s.led.material.emissive.set('#3ddc84'); s.led.material.emissiveIntensity = 1.2; s.led.userData.keepEmissive = true;
+  }
+  applyHighlight(t);
+  if (fly) { fly.k = Math.min(1, fly.k + dt / 1.0); const e = 1 - Math.pow(1 - fly.k, 3); camera.position.lerpVectors(fly.p0, fly.p1, e); controls.target.lerpVectors(fly.t0, fly.t1, e); if (fly.k >= 1) fly = null; }
+  controls.update();
+  table.visible = camera.position.y > TABLE_Y + 0.5;
+  renderer.render(scene, camera);
+  placeLabels();
+  if (now - lastUi > 250) {
+    labelText(); lastUi = now;
+    const pid = $('#pieceCard').dataset.part;
+    if (pid && LEVELS[pid] !== undefined && $('#pieceLvl')) { $('#pieceLvl').style.width = LEVELS[pid] * 100 + '%'; $('#pieceLvlTxt').textContent = `Nivel ahora: ${Math.round(LEVELS[pid] * 100)}%${ON[{ pozo: 'V0', reserva: 'B1', tinaco: 'B5', vacas: 'B2', caballos: 'B3', cerdos: 'B4' }[pid]] ? ' · llenándose' : ''}`; }
+  }
+  requestAnimationFrame(frame);
+}
+labelText();
+window.__sceneReady = true;
+$('#loading').hidden = true;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -57,6 +57,7 @@ button,input,select{font:inherit;color:inherit}
 .tb-spacer{flex:1}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--raise);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap;transition:background .15s,border-color .15s}
 .btn:hover{background:rgba(180,215,232,.12)}
+a.btn{text-decoration:none;color:var(--ink)}
 .btn:focus-visible,.seg button:focus-visible,.tab:focus-visible,.switch input:focus-visible+span{outline:2px solid var(--water);outline-offset:2px}
 .btn.primary{background:var(--water-deep);border-color:transparent;color:#fff}
 .btn.primary:hover{background:#2590c9}
@@ -214,7 +215,7 @@ pre.code{margin:8px 0 0;overflow:auto;font-family:var(--f-mono);font-size:11.5px
   .brand h1{font-size:18px}
   #topbar{gap:8px 10px}
   .tb-spacer{display:none}
-  #voiceBtn span,#camBtn span,#hideBtn span{display:none}
+  #voiceBtn span,#camBtn span,#hideBtn span,#maqLink span{display:none}
   .clock{padding:6px 8px;font-size:12px}
   .seg button{padding:6px 7px}
   #assistant{display:none}
@@ -270,6 +271,7 @@ pre.code{margin:8px 0 0;overflow:auto;font-family:var(--f-mono);font-size:11.5px
     <button class="btn" id="voiceBtn" aria-pressed="false" aria-label="Voz del asistente" title="Voz del asistente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 8.5a5 5 0 0 1 0 7"/></svg><span>Voz apagada</span></button>
     <button class="btn" id="camBtn" title="Volver a la vista general" aria-label="Vista general"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span>Vista general</span></button>
     <button class="btn" id="hideBtn" aria-pressed="false" aria-label="Ocultar paneles" title="Ocultar paneles para ver toda la escena (tecla H)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Ocultar paneles</span></button>
+    <a class="btn" id="maqLink" href="maqueta.html" title="Ver cómo se arma la maqueta real" aria-label="Maqueta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15h18v3H3z"/><path d="M7 15V6h4v9M14 15v-5h5v5"/></svg><span>Maqueta</span></a>
   </div>
 </header>
 

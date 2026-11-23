@@ -4,7 +4,17 @@ Representación 3D interactiva del proyecto IoT de agua para la granja: pozo, ta
 
 ## Cómo abrirlo
 
-Abre `index.html` en Chrome, Edge o Firefox. Necesita internet la primera vez porque carga Three.js desde un CDN.
+Abre `index.html` (simulación de la granja) o `maqueta.html` (maqueta física) en Chrome, Edge o Firefox. Necesita internet porque carga Three.js desde un CDN. Cada página tiene un botón para pasar a la otra.
+
+## Maqueta (`maqueta.html`)
+
+Cómo se vería la maqueta real a escala (1 unidad = 1 cm): una plancha de hielo seco de 100 × 60 cm elevada sobre 4 soportes de 15 cm, con botellas PET cortadas como pozo, red de agua, tanque de reserva, tinaco y bebederos. Los cables pasan por debajo de la plancha.
+
+- **Armado**: 12 pasos en orden. Cada paso mueve la cámara e ilumina las piezas que usa.
+- **Pieza**: toca cualquier pieza para ver material, medidas, cómo hacerla y cómo se conecta.
+- **Materiales**: lista de compras y el largo de manguera y cable calculado desde el modelo.
+- **Cables**: cada tramo de cable con sus pines del ESP32 y su largo.
+- Botones **Por debajo** y **Rayos X** para ver el cableado, y el agua se mueve a la velocidad real de las mini bombas.
 
 ## Qué se puede hacer
 

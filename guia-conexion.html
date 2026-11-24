@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guía de Conexión</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: documento de una columna (~820px) para seguir en el taller; pasos numerados reales, tablas de conexión con color de cable, diagrama SVG de alimentación.
+   Mismo sistema visual oscuro que la simulación y la maqueta (un solo tema, elegido a propósito). */
+:root{
+  --bg:#0d171d; --surface:#132129; --raise:rgba(180,215,232,.06); --line:rgba(173,205,222,.16);
+  --ink:#e3edf2; --muted:#93a9b5; --water:#4ab6e6; --water-deep:#1d7fb3;
+  --ok:#4fc58e; --warn:#efb23d; --crit:#f0604f;
+  --w-vcc:#e5483d; --w-33:#f08a2c; --w-gnd:#9aa4aa; --w-trig:#f2c230; --w-echo:#3fb36b; --w-sig:#5aa9ff;
+  --f-display:'Barlow Semi Condensed','Arial Narrow',system-ui,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15.5px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(30px,6vw,42px)}
+h2{font-size:26px;margin-top:44px}
+h3{font-size:19px;font-weight:600}
+p{margin:0}
+.lede{color:#c8d6de;font-size:17px;max-width:65ch;margin-top:10px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--water)}
+a{color:var(--water)}
+code,.mono{font-family:var(--f-mono);font-size:.9em}
+code{background:rgba(0,0,0,.3);padding:1px 6px;border-radius:4px;overflow-wrap:anywhere}
+.stack{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card > * + *{margin-top:8px}
+.muted{color:var(--muted)}
+.issue{border-left:4px solid var(--warn)}
+.issue.crit{border-left-color:var(--crit)}
+.issue.ok{border-left-color:var(--ok)}
+.sev{display:inline-block;font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;padding:2px 7px;border-radius:5px;background:rgba(239,178,61,.18);color:#f6cf82}
+.crit .sev{background:rgba(240,96,79,.2);color:#ffaa9f}
+.ok .sev{background:rgba(79,197,142,.18);color:#8fe2b9}
+.verdict{background:linear-gradient(180deg,rgba(74,182,230,.12),rgba(74,182,230,.04));border-color:rgba(74,182,230,.35)}
+.phase{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px}
+ul,ol{margin:0;padding-left:20px}
+li + li{margin-top:4px}
+
+.toc{display:flex;flex-wrap:wrap;gap:6px;margin-top:18px}
+.toc a{font-size:13px;text-decoration:none;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:4px 11px;background:var(--raise)}
+.toc a:hover{border-color:var(--water)}
+
+.step{display:grid;grid-template-columns:44px 1fr;gap:4px 14px;margin-top:28px}
+.step .n{width:40px;height:40px;border-radius:50%;background:var(--water-deep);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-weight:500;font-size:16px}
+.step .body{min-width:0;display:flex;flex-direction:column;gap:12px}
+.step h3{padding-top:8px}
+.tip{background:rgba(239,178,61,.1);border:1px solid rgba(239,178,61,.3);color:#f3dcab;border-radius:10px;padding:10px 12px;font-size:14.5px}
+.warn{background:rgba(240,96,79,.1);border:1px solid rgba(240,96,79,.35);color:#ffd3cd;border-radius:10px;padding:10px 12px;font-size:14.5px}
+.check{background:rgba(79,197,142,.08);border:1px solid rgba(79,197,142,.3);border-radius:10px;padding:10px 12px;font-size:14.5px}
+.check b{color:#8fe2b9}
+
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:480px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:500;background:var(--raise)}
+td.mono{font-family:var(--f-mono);font-size:13px;white-space:nowrap}
+.w{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.w::before{content:"";width:18px;height:5px;border-radius:3px;background:var(--c,#888)}
+.vcc{--c:var(--w-vcc)} .v33{--c:var(--w-33)} .gnd{--c:var(--w-gnd)} .trig{--c:var(--w-trig)} .echo{--c:var(--w-echo)} .sig{--c:var(--w-sig)}
+.cable{font-family:var(--f-mono);font-size:12px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.08);white-space:nowrap}
+
+.diagram{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:#0f1c23;padding:10px}
+.diagram svg{display:block;min-width:760px;width:100%;height:auto}
+.diagram .bx{fill:#17262f;stroke:rgba(173,205,222,.35);stroke-width:1.5}
+.diagram .bx.hot{stroke:var(--crit)}
+.diagram .t{fill:var(--ink);font-family:var(--f-body);font-size:15px;font-weight:600}
+.diagram .s{fill:var(--muted);font-family:var(--f-mono);font-size:11.5px}
+.diagram .ln{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+
+.code{position:relative;margin-top:12px}
+.code pre{margin:0;max-height:520px;overflow:auto;background:#0a1318;border:1px solid var(--line);border-radius:12px;padding:16px;font-family:var(--f-mono);font-size:12.5px;line-height:1.55;color:#d6e6ee}
+.copy{position:absolute;top:10px;right:10px;border:1px solid var(--line);background:#1d2d36;color:var(--ink);border-radius:8px;padding:6px 12px;font:500 13px var(--f-body);cursor:pointer}
+.copy:hover{background:#26404d}
+.copy:focus-visible,.toc a:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+footer{margin-top:48px;color:var(--muted);font-size:13.5px}
+@media (max-width:560px){ .step{grid-template-columns:34px 1fr;gap:4px 10px} .step .n{width:32px;height:32px;font-size:14px} body{font-size:15px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Monitor Hídrico · paso a paso</p>
+  <h1>Guía de conexión y armado</h1>
+  <p class="lede">Hecha a partir de las fotos de sus piezas: ESP32 con USB-C, módulo de relé de 2 canales, fuente MB102 (HW-131), mini bombas sumergibles, sensores HC-SR04 y cables macho-macho, macho-hembra y hembra-hembra.</p>
+
+  <nav class="toc" aria-label="Secciones">
+    <a href="#veredicto">¿Se puede?</a><a href="#voltaje">Problemas de voltaje</a><a href="#diagrama">Diagrama</a><a href="#cables">Qué cable usar</a><a href="#pasos">Paso a paso</a><a href="#pines">Tabla de pines</a><a href="#codigo">Código</a><a href="#fase2">Fase 2</a>
+  </nav>
+
+  <h2 id="veredicto">¿Se puede hacer todo?</h2>
+  <div class="card verdict stack" style="margin-top:14px">
+    <p><b>Sí, pero en dos fases.</b> Con lo que tienen hoy pueden armar una versión completa y funcional: pozo → tanque de reserva → bebedero de vacas, con llenado automático, paro al llenarse, protección contra trabajo en seco, detección de fugas y la página web en el celular. Para la maqueta completa (6 depósitos y 6 bombas) les faltan relés, 2 bombas y quizá sensores.</p>
+    <div class="phase">
+      <div class="card"><h3>Fase 1 · con lo que tienen</h3><ul class="muted"><li>3 HC-SR04: pozo, reserva, vacas</li><li>2 bombas: B1 y B2</li><li>El módulo de 2 relés</li><li>ESP32 + MB102</li></ul></div>
+      <div class="card"><h3>Fase 2 · maqueta completa</h3><ul class="muted"><li>6 HC-SR04</li><li>6 bombas (V0, B1–B5)</li><li>Un módulo de 8 relés de <b>5 V</b></li><li>Se agregan filas en el código</li></ul></div>
+    </div>
+  </div>
+
+  <h2 id="voltaje">Los problemas de voltaje (y cómo se resuelven)</h2>
+  <p class="muted" style="margin-top:8px">Les dijeron bien: hay problemas. Este es el más grave, y se ve en la foto del relé.</p>
+  <div class="stack">
+    <div class="card issue crit">
+      <span class="sev">GRAVE</span>
+      <h3>1. Sus relés son de 24 V, no de 5 V</h3>
+      <p>Los cubos azules dicen <code>SRD-24VDC-SL-C</code>: la bobina necesita <b>24 V</b> para cerrar el contacto. Con los 5 V del MB102 el LED puede encender, pero el relé no hace clic y la bomba no arranca.</p>
+      <p><b>Opción A (recomendada):</b> comprar un módulo de relés de <b>5 V</b> (dice <code>SRD-05VDC-SL-C</code>). Mejor uno de 8 canales: alcanza para las 6 bombas de la fase 2.<br><b>Opción B:</b> usar este módulo con un adaptador de <b>24 V, 1 A</b> conectado solo a <code>DC+</code> y <code>DC-</code> del relé. Funciona, pero es una fuente más y solo da 2 canales.</p>
+    </div>
+    <div class="card issue">
+      <span class="sev">IMPORTANTE</span>
+      <h3>2. El ESP32 trabaja a 3.3 V</h3>
+      <p>Si el HC-SR04 se alimenta con 5 V, su pin <code>ECHO</code> devuelve 5 V y puede dañar el ESP32. Su modelo dice "3–5.5 V": <b>aliméntenlo con 3.3 V</b> y el ECHO sale a 3.3 V, sin riesgo. Si con 3.3 V no da lectura, pasen VCC a 5 V y pongan un divisor en ECHO: <code>ECHO → 1 kΩ → GPIO</code> y <code>GPIO → 2 kΩ → GND</code>.</p>
+    </div>
+    <div class="card issue">
+      <span class="sev">IMPORTANTE</span>
+      <h3>3. El MB102 no aguanta muchas bombas juntas</h3>
+      <p>Su regulador de 5 V (<code>1117 5.0</code>) da como máximo unos 800 mA y se calienta. Cada mini bomba gasta 100–200 mA y al arrancar pide más. <b>No enciendan más de 2 bombas a la vez</b> (el código ya lo impide) y alimenten el MB102 con un adaptador de <b>9 V</b> en <code>DC-in</code> (no 12 V: se calienta más). Si se calienta, usen un cargador de celular de 5 V y 2 A solo para las bombas.</p>
+    </div>
+    <div class="card issue">
+      <span class="sev">IMPORTANTE</span>
+      <h3>4. Todas las tierras (GND) unidas</h3>
+      <p>El GND del ESP32, el riel GND de la protoboard y el <code>DC-</code> del relé deben estar conectados entre sí. Sin eso, las señales no tienen referencia y los relés o sensores fallan al azar. El <b>positivo</b> de cada fuente va solo a lo suyo: nunca se juntan 24 V, 9 V y 5 V.</p>
+    </div>
+    <div class="card issue ok">
+      <span class="sev">ESTÁ BIEN</span>
+      <h3>5. Lo que no es problema</h3>
+      <p>El relé se controla bien desde los 3.3 V del ESP32 (la entrada tiene optoacoplador con resistencia de 1 kΩ). Las bombas a 5 V están dentro de su rango (3–5 V). El ESP32 se alimenta por su USB-C, aparte, y no tiene que cargar con las bombas.</p>
+    </div>
+  </div>
+
+  <h2 id="diagrama">Diagrama de alimentación y señales (fase 1)</h2>
+  <p class="muted" style="margin-top:8px">Tres fuentes separadas, una sola tierra. Desliza de lado en el celular.</p>
+  <div class="diagram" style="margin-top:14px" role="img" aria-label="Diagrama: adaptador de 9 V al MB102 y la protoboard; riel de 3.3 V y GND a los sensores; TRIG y ECHO de los sensores al ESP32; ESP32 alimentado por USB-C; GPIO 25 y 26 a IN1 e IN2 del relé; adaptador de 24 V a DC+ y DC- del relé; riel de 5 V a COM1 y COM2; NO1 y NO2 al cable rojo de cada bomba; negro de las bombas a GND.">
+    <svg viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg">
+      <!-- cajas -->
+      <rect class="bx" x="20" y="30" width="160" height="58" rx="8"/><text class="t" x="34" y="55">Adaptador 9 V</text><text class="s" x="34" y="75">al plug DC-in</text>
+      <rect class="bx" x="230" y="20" width="210" height="200" rx="8"/><text class="t" x="244" y="46">Protoboard + MB102</text>
+      <text class="s" x="246" y="80">riel 5 V</text><line x1="246" y1="90" x2="426" y2="90" stroke="var(--w-vcc)" stroke-width="5"/>
+      <text class="s" x="246" y="120">riel 3.3 V</text><line x1="246" y1="130" x2="426" y2="130" stroke="var(--w-33)" stroke-width="5"/>
+      <text class="s" x="246" y="160">riel GND</text><line x1="246" y1="170" x2="426" y2="170" stroke="var(--w-gnd)" stroke-width="5"/>
+      <text class="s" x="246" y="205">jumpers: 5 V y 3.3 V</text>
+      <rect class="bx" x="520" y="20" width="200" height="76" rx="8"/><text class="t" x="534" y="46">3 × HC-SR04</text><text class="s" x="534" y="66">VCC  TRIG  ECHO  GND</text><text class="s" x="534" y="84">pozo · reserva · vacas</text>
+      <rect class="bx" x="520" y="180" width="200" height="170" rx="8"/><text class="t" x="534" y="206">ESP32</text>
+      <text class="s" x="534" y="230">TRIG → GPIO 4 · 5 · 19</text><text class="s" x="534" y="250">ECHO → GPIO 34 · 35 · 39</text>
+      <text class="s" x="534" y="296">GPIO 25 → IN1</text><text class="s" x="534" y="321">GPIO 26 → IN2</text><text class="s" x="534" y="344">GND → riel GND</text>
+      <rect class="bx" x="760" y="238" width="120" height="58" rx="8"/><text class="t" x="774" y="263">Cargador/PC</text><text class="s" x="774" y="283">cable USB-C</text>
+      <rect class="bx hot" x="230" y="280" width="210" height="170" rx="8"/><text class="t" x="244" y="305">Relé 2 canales</text><text class="s" x="244" y="322">SRD-24VDC</text>
+      <text class="s" x="244" y="350">COM1</text><text class="s" x="244" y="372">NO1</text><text class="s" x="244" y="406">COM2</text><text class="s" x="244" y="428">NO2</text>
+      <text class="s" x="392" y="304">IN1</text><text class="s" x="392" y="329">IN2</text><text class="s" x="392" y="378">DC+</text><text class="s" x="392" y="403">DC−</text>
+      <rect class="bx hot" x="520" y="392" width="200" height="66" rx="8"/><text class="t" x="534" y="418">Adaptador 24 V</text><text class="s" x="534" y="438">solo si usan este relé</text>
+      <rect class="bx" x="20" y="390" width="160" height="96" rx="8"/><text class="t" x="34" y="416">Bombas B1, B2</text><text class="s" x="34" y="438">rojo ← NO del relé</text><text class="s" x="34" y="456">negro → riel GND</text><text class="s" x="34" y="474">(dentro del agua)</text>
+      <!-- cables -->
+      <path class="ln" stroke="var(--w-gnd)" d="M180 59 H230"/>
+      <path class="ln" stroke="var(--w-33)" d="M426 130 C470 130 480 62 520 62"/>
+      <path class="ln" stroke="var(--w-gnd)" d="M426 170 C478 170 486 82 520 82"/>
+      <path class="ln" stroke="var(--w-trig)" d="M590 96 V180"/>
+      <path class="ln" stroke="var(--w-echo)" d="M650 96 V180"/>
+      <path class="ln" stroke="var(--w-gnd)" d="M520 340 C480 340 470 200 432 176"/>
+      <path class="ln" stroke="var(--w-sig)" d="M520 292 C480 292 470 300 430 300"/>
+      <path class="ln" stroke="var(--w-sig)" d="M520 317 C480 317 470 325 430 325"/>
+      <path class="ln" stroke="var(--w-vcc)" d="M520 414 C480 414 470 374 430 374"/>
+      <path class="ln" stroke="var(--w-gnd)" d="M520 436 C480 436 470 399 430 399"/>
+      <path class="ln" stroke="var(--w-vcc)" d="M760 267 H720"/>
+      <path class="ln" stroke="var(--w-vcc)" d="M246 90 H205 V402 H238"/>
+      <path class="ln" stroke="var(--w-vcc)" d="M205 346 H238"/>
+      <path class="ln" stroke="var(--w-vcc)" d="M238 368 C205 368 205 420 180 420"/>
+      <path class="ln" stroke="var(--w-vcc)" d="M238 424 C215 424 210 446 180 446"/>
+      <circle cx="205" cy="346" r="4.5" fill="var(--w-vcc)"/>
+    </svg>
+  </div>
+  <p class="muted" style="font-size:13.5px;margin-top:8px">Rojo: 5 V · naranja: 3.3 V · gris: GND · amarillo: TRIG · verde: ECHO · azul: señales del ESP32 al relé. Con un relé de 5 V, el <code>DC+</code> va al riel de 5 V y desaparece el adaptador de 24 V.</p>
+
+  <h2 id="cables">Qué cable usar en cada conexión</h2>
+  <p class="muted" style="margin-top:8px">El ESP32 y los HC-SR04 tienen pines macho; la protoboard tiene agujeros (hembra); los bornes del relé son de tornillo.</p>
+  <div class="tbl" style="margin-top:14px"><table>
+    <thead><tr><th>Conexión</th><th>Cable</th><th>Cómo</th></tr></thead>
+    <tbody>
+      <tr><td>HC-SR04 VCC y GND → protoboard</td><td><span class="cable">H-M</span></td><td>Hembra en el pin del sensor, macho en el riel</td></tr>
+      <tr><td>HC-SR04 TRIG y ECHO → ESP32</td><td><span class="cable">H-H</span></td><td>Hembra en el sensor y hembra en el pin del ESP32</td></tr>
+      <tr><td>ESP32 GND → protoboard</td><td><span class="cable">H-M</span></td><td>Hembra en el pin GND, macho en el riel GND</td></tr>
+      <tr><td>ESP32 GPIO → IN1 / IN2 del relé</td><td><span class="cable">H-M</span></td><td>Hembra en el ESP32, la punta macho se aprieta en el tornillo</td></tr>
+      <tr><td>Riel 5 V → COM1 / COM2 · riel GND → DC−</td><td><span class="cable">M-M</span></td><td>Una punta en la protoboard, la otra en el tornillo</td></tr>
+      <tr><td>Bomba, cable rojo → NO1 / NO2</td><td>su propio cable</td><td>Tuerce los hilitos pelados y apriétalos directo en el tornillo</td></tr>
+      <tr><td>Bomba, cable negro → riel GND</td><td><span class="cable">M-M</span></td><td>Enrolla el hilo pelado en una punta macho y cúbrelo con cinta aislante (mejor si lo sueldan)</td></tr>
+      <tr><td>Alargar cualquier cable</td><td><span class="cable">H-M</span></td><td>Mete la punta macho de un H-M en la punta hembra del cable que falta alargar; asegura la unión con cinta</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tip" style="margin-top:12px">Los jumpers miden 20 cm. Para la fase 1 alcanzan, con algunas extensiones. Para la maqueta completa, los tramos por debajo de la plancha miden 60–120 cm: ahí conviene cable de red (UTP) y jumpers solo en las puntas.</div>
+
+  <h2 id="pasos">Paso a paso</h2>
+  <div class="warn" style="margin-top:14px">Todo se conecta con <b>todo desenchufado</b>. Se enchufa solo para probar, y la electrónica siempre lejos del agua.</div>
+
+  <div class="step"><div class="n">1</div><div class="body">
+    <h3>Preparar la protoboard y el MB102</h3>
+    <ol>
+      <li>Inserta el MB102 en un extremo de la protoboard: sus pines entran en los dos pares de rieles (+ y −).</li>
+      <li>Jumpers amarillos: en un lado ponlo en <b>5V</b> (ese será el riel de bombas y relé) y en el otro lado en <b>3.3</b> (riel de sensores). En la foto ambos están en 3.3: cambien uno.</li>
+      <li>Conecta el adaptador de 9 V en <code>DC-in</code> y presiona el botón blanco. Se enciende el LED verde.</li>
+      <li>Marca los rieles con cinta: "5 V", "3.3 V" y "GND".</li>
+    </ol>
+    <div class="check"><b>Comprobar:</b> con un multímetro, entre + y − de cada riel: ~5 V en un lado, ~3.3 V en el otro. Apaga el botón antes de seguir.</div>
+  </div></div>
+
+  <div class="step"><div class="n">2</div><div class="body">
+    <h3>Ubicar el ESP32</h3>
+    <ol>
+      <li><b>No lo pongan en la protoboard:</b> es tan ancho que tapa todos los agujeros de un lado. Pégalo sobre un pedazo de hielo seco (como en su foto) junto a la protoboard.</li>
+      <li>Se alimenta por su <b>USB-C</b> (computadora o cargador). No conecten además 5 V a su pin <code>5V/VIN</code>: una sola fuente para el ESP32.</li>
+      <li>Une un pin <code>GND</code> del ESP32 al riel GND con un cable <span class="cable">H-M</span>. Este es el GND común.</li>
+    </ol>
+    <div class="tip">Los pines 36 y 39 a veces vienen marcados como <code>VP</code> y <code>VN</code> (o <code>SP</code> y <code>SN</code>). Los GPIO 34, 35, 36 y 39 solo sirven como entrada: por eso se usan para ECHO.</div>
+  </div></div>
+
+  <div class="step"><div class="n">3</div><div class="body">
+    <h3>Conectar los 3 sensores HC-SR04</h3>
+    <p>Uno por uno, siempre con el mismo color de cable para cada función:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Sensor</th><th><span class="w v33">VCC</span></th><th><span class="w gnd">GND</span></th><th><span class="w trig">TRIG</span></th><th><span class="w echo">ECHO</span></th></tr></thead>
+      <tbody>
+        <tr><td>Pozo</td><td>riel 3.3 V</td><td>riel GND</td><td class="mono">GPIO 4</td><td class="mono">GPIO 34</td></tr>
+        <tr><td>Tanque de reserva</td><td>riel 3.3 V</td><td>riel GND</td><td class="mono">GPIO 5</td><td class="mono">GPIO 35</td></tr>
+        <tr><td>Bebedero de vacas</td><td>riel 3.3 V</td><td>riel GND</td><td class="mono">GPIO 19</td><td class="mono">GPIO 39 (VN)</td></tr>
+      </tbody>
+    </table></div>
+    <div class="tip">Ponle una banderita de cinta a cada cable en las dos puntas ("Pozo TRIG", etc.). Cuando estén por debajo de la maqueta no hay forma de seguirlos con la vista.</div>
+  </div></div>
+
+  <div class="step"><div class="n">4</div><div class="body">
+    <h3>Subir el programa y probar los sensores</h3>
+    <ol>
+      <li>Instala <b>Arduino IDE</b>. En <i>Preferencias → URLs adicionales</i> agrega <code>https://espressif.github.io/arduino-esp32/package_esp32_index.json</code> y en <i>Gestor de tarjetas</i> instala <b>esp32 de Espressif</b>.</li>
+      <li>Abre el código (sección <a href="#codigo">Código</a>), cambia <code>NOMBRE_DE_TU_WIFI</code> y <code>CLAVE_DE_TU_WIFI</code>.</li>
+      <li>Placa: <b>ESP32 Dev Module</b>. Puerto: el que aparece al conectar el USB-C. Si no aparece ningún puerto, instala el driver CH340 o CP210x (según el chip cerca del USB).</li>
+      <li>Presiona <b>Subir</b>. Si se queda en "Connecting…", mantén presionado el botón <b>BOOT</b> (al lado del USB-C) hasta que empiece a cargar.</li>
+      <li>Abre el <b>Monitor Serie</b> a <b>115200</b>.</li>
+    </ol>
+    <div class="check"><b>Comprobar:</b> cada 2 s sale una línea como <code>Pozo: 18.3 cm = 12%</code>. Pon la mano a 10 cm de cada sensor: la distancia debe cambiar. Si dice "sin lectura", revisa ese sensor (o pásalo a 5 V con el divisor del problema 2).</div>
+  </div></div>
+
+  <div class="step"><div class="n">5</div><div class="body">
+    <h3>Calibrar cada depósito</h3>
+    <ol>
+      <li>Monta cada sensor en su puente sobre la botella, como en la <a href="https://claude.ai/artifact/8C2HuNKyjTKaTi3hsdVBoQ" target="_blank" rel="noopener">maqueta 3D</a>.</li>
+      <li>Con la botella <b>vacía</b>, anota la distancia del Monitor Serie: es <code>cmVacio</code>.</li>
+      <li>Llénala hasta donde la quieres "llena" (deja 3 cm o más hasta el sensor) y anota: es <code>cmLleno</code>.</li>
+      <li>Escribe esos números en la tabla <code>dep[]</code> del código y vuelve a subirlo.</li>
+    </ol>
+  </div></div>
+
+  <div class="step"><div class="n">6</div><div class="body">
+    <h3>Conectar el relé (lado de control), todavía sin bombas</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Borne del relé</th><th>Va a</th><th>Cable</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">IN1</td><td><span class="w sig">GPIO 25</span> del ESP32 (bomba B1)</td><td><span class="cable">H-M</span></td></tr>
+        <tr><td class="mono">IN2</td><td><span class="w sig">GPIO 26</span> del ESP32 (bomba B2)</td><td><span class="cable">H-M</span></td></tr>
+        <tr><td class="mono">DC−</td><td><span class="w gnd">riel GND</span> y negativo del adaptador de 24 V</td><td><span class="cable">M-M</span></td></tr>
+        <tr><td class="mono">DC+</td><td><span class="w vcc">positivo del adaptador de 24 V</span> (con relé de 5 V: riel 5 V)</td><td>cable del adaptador</td></tr>
+      </tbody>
+    </table></div>
+    <p>Pon los dos jumpers <code>S1</code> y <code>S2</code> en <b>High</b>. Así el relé se activa cuando el ESP32 manda 3.3 V, y al arrancar (pines en 0 V) las bombas quedan apagadas.</p>
+    <div class="warn">Nunca conecten los 24 V a la protoboard ni al ESP32. Ese adaptador toca solo <code>DC+</code> y <code>DC−</code>.</div>
+    <div class="check"><b>Comprobar:</b> abre la página web del ESP32 (paso 9) o espera a que un depósito vacío active su bomba: el LED del canal se enciende y se oye el <b>clic</b>. LED sin clic = la bobina no recibe 24 V (problema 1).</div>
+  </div></div>
+
+  <div class="step"><div class="n">7</div><div class="body">
+    <h3>Conectar las bombas (lado de potencia)</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Borne del relé</th><th>Va a</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">COM1 y COM2</td><td><span class="w vcc">riel 5 V</span> de la protoboard (un cable <span class="cable">M-M</span> a cada uno)</td></tr>
+        <tr><td class="mono">NO1</td><td>cable <b>rojo</b> de la bomba B1 (pozo → reserva)</td></tr>
+        <tr><td class="mono">NO2</td><td>cable <b>rojo</b> de la bomba B2 (reserva → vacas)</td></tr>
+        <tr><td class="mono">NC1 y NC2</td><td>nada (quedan libres)</td></tr>
+        <tr><td>Cable negro de cada bomba</td><td><span class="w gnd">riel GND</span></td></tr>
+      </tbody>
+    </table></div>
+    <div class="tip">Las mini bombas <b>no deben funcionar en seco</b>: se dañan. Pruébalas primero dentro de un vaso con agua, con la manguera puesta y la salida en otro vaso.</div>
+    <div class="check"><b>Comprobar:</b> con la bomba en el vaso, al activarse el relé debe salir agua por la manguera. Si gira al revés o no sale agua, revisa que la manguera esté en la salida (la boquilla lateral) y no en la rejilla de entrada.</div>
+  </div></div>
+
+  <div class="step"><div class="n">8</div><div class="body">
+    <h3>Montar todo en la maqueta</h3>
+    <ol>
+      <li>Sigue los pasos de armado de la <a href="https://claude.ai/artifact/8C2HuNKyjTKaTi3hsdVBoQ" target="_blank" rel="noopener">maqueta 3D</a>: plancha de hielo seco elevada, botellas, puentes de palitos para los sensores.</li>
+      <li>B1 va en el fondo del pozo; B2 en el fondo del tanque de reserva.</li>
+      <li>Haz un agujerito de 1 mm en cada manguera, dentro del depósito y por encima del agua (anti-sifón). Sin él, el tanque alto sigue vaciándose al bebedero aunque la bomba esté apagada.</li>
+      <li>Pasa los cables por agujeros de la plancha, pégalos por debajo con cinta y súbelos en la zona de control. Deja la protoboard, el relé y el ESP32 sobre un cartón, lejos de las botellas.</li>
+    </ol>
+  </div></div>
+
+  <div class="step"><div class="n">9</div><div class="body">
+    <h3>Probar el sistema completo</h3>
+    <ol>
+      <li>Enciende en este orden: adaptador de 24 V, MB102 (9 V) y por último el ESP32 (USB-C).</li>
+      <li>En el Monitor Serie aparece <code>Abre en el celular: http://192.168.x.x</code>. Abre esa dirección en un celular conectado al mismo WiFi: es la app con niveles, bombas y alertas.</li>
+      <li><b>Llenado automático:</b> vacía el bebedero con una jeringa o un vaso; al bajar de 30 % se enciende B2 y al llegar a 90 % se apaga sola.</li>
+      <li><b>Ya está lleno:</b> con el bebedero lleno, toca "Llenar": la bomba no enciende y sale el aviso.</li>
+      <li><b>Trabajo en seco:</b> si el tanque de reserva baja de 10 %, B2 se detiene sola.</li>
+      <li><b>Fuga:</b> mientras B2 llena, saca la manguera del bebedero y ponla en un vaso aparte. A los 20 s sale <i>"CUIDADO: … no subió. Puede haber una manguera rota"</i> y la bomba queda bloqueada. Vuelve a poner la manguera y toca "Rearmar".</li>
+      <li><b>Sin WiFi:</b> apaga el router: las bombas siguen funcionando; solo la página deja de responder.</li>
+    </ol>
+  </div></div>
+
+  <h2 id="pines">Tabla de pines completa</h2>
+  <p class="muted" style="margin-top:8px">La fase 1 usa las tres primeras filas de sensores y B1, B2. Es la misma asignación que la simulación y la maqueta.</p>
+  <div class="tbl" style="margin-top:14px"><table>
+    <thead><tr><th>Depósito</th><th>TRIG</th><th>ECHO</th><th>Bomba que lo llena</th><th>GPIO del relé</th><th>Fase</th></tr></thead>
+    <tbody>
+      <tr><td>Pozo</td><td class="mono">4</td><td class="mono">34</td><td>V0 (desde la red)</td><td class="mono">23</td><td>1 (V0 en fase 2)</td></tr>
+      <tr><td>Tanque de reserva</td><td class="mono">5</td><td class="mono">35</td><td>B1 (desde el pozo)</td><td class="mono">25</td><td>1</td></tr>
+      <tr><td>Bebedero de vacas</td><td class="mono">19</td><td class="mono">39 (VN)</td><td>B2</td><td class="mono">26</td><td>1</td></tr>
+      <tr><td>Bebedero de caballos</td><td class="mono">21</td><td class="mono">16</td><td>B3</td><td class="mono">27</td><td>2</td></tr>
+      <tr><td>Bebedero de cerdos</td><td class="mono">22</td><td class="mono">17</td><td>B4</td><td class="mono">32</td><td>2</td></tr>
+      <tr><td>Tinaco de la casa</td><td class="mono">18</td><td class="mono">36 (VP)</td><td>B5</td><td class="mono">33</td><td>2</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2 id="codigo">Código para el ESP32</h2>
+  <p class="muted" style="margin-top:8px">Copia todo, pégalo en un sketch nuevo de Arduino IDE y cambia el nombre y la clave del WiFi. También está en el repositorio, en <code>firmware/monitor_hidrico/monitor_hidrico.ino</code>.</p>
+  <div class="code">
+    <button class="copy" id="copyBtn" type="button">Copiar código</button>
+    <pre id="code">/*
+  Monitor Hídrico · Maqueta IoT con ESP32
+  ---------------------------------------
+  FASE 1 (con las piezas que ya tienen):
+    - 3 sensores HC-SR04: pozo, tanque de reserva y bebedero de vacas
+    - 1 módulo de relé de 2 canales: B1 (pozo -&gt; reserva) y B2 (reserva -&gt; vacas)
+
+  Qué hace:
+    - Mide el nivel de cada depósito (%) con el ultrasonido.
+    - Enciende la bomba cuando el destino baja de NIVEL_ENCENDER y la apaga sola en NIVEL_APAGAR.
+      Aunque la enciendas a mano, se apaga sola al llenarse. Si ya está lleno, no enciende.
+    - No deja trabajar una bomba en seco (origen casi vacío).
+    - Detecta fugas: si una bomba lleva VENTANA_FUGA_MS encendida y el destino no sube, la apaga y la bloquea.
+    - Nunca enciende más de MAX_BOMBAS_A_LA_VEZ bombas (para no sobrecargar el MB102).
+    - Crea una página web en el ESP32: ábrela desde el celular con la IP que sale en el Monitor Serie.
+      Si se cae el WiFi, el control sigue funcionando igual.
+
+  Para agregar más depósitos o bombas (fase 2), agrega filas en dep[] y bom[].
+  Placa en Arduino IDE: "ESP32 Dev Module". Monitor Serie a 115200.
+*/
+
+#include &lt;WiFi.h&gt;
+#include &lt;WebServer.h&gt;
+
+// ================== 1. AJUSTES ==================
+const char* WIFI_SSID = "NOMBRE_DE_TU_WIFI";
+const char* WIFI_PASS = "CLAVE_DE_TU_WIFI";
+
+// Jumper del módulo de relé en "High": el relé se activa con HIGH.
+// Si lo pones en "Low", cambia estas dos líneas (ON = LOW, OFF = HIGH).
+#define RELE_ON  HIGH
+#define RELE_OFF LOW
+
+const float NIVEL_ENCENDER = 30.0;   // % : debajo de esto se enciende la bomba (modo automático)
+const float NIVEL_APAGAR   = 90.0;   // % : al llegar aquí se apaga sola
+const float NIVEL_SECO     = 10.0;   // % : si el origen baja de esto, la bomba se detiene
+const unsigned long VENTANA_FUGA_MS = 20000;  // tiempo para revisar si el nivel sube
+const float SUBIDA_MINIMA = 3.0;     // % que debe subir el destino en esa ventana
+const int MAX_BOMBAS_A_LA_VEZ = 2;
+
+// ================== 2. DEPÓSITOS ==================
+// cmVacio: distancia del sensor al fondo (depósito vacío)
+// cmLleno: distancia del sensor al agua cuando está lleno (mínimo 3 cm)
+// Mídelos con el Monitor Serie y corrígelos aquí (paso de calibración).
+struct Deposito {
+  const char* nombre;
+  int trig, echo;
+  float cmVacio, cmLleno;
+  float cm;      // última distancia medida
+  float nivel;   // %
+  bool ok;       // el sensor respondió
+};
+
+Deposito dep[] = {
+  // nombre               TRIG ECHO  vacío lleno
+  {"Pozo",                 4,  34,  20.0,  5.5, 0, 0, false},
+  {"Tanque de reserva",    5,  35,  25.0,  5.0, 0, 0, false},
+  {"Bebedero de vacas",   19,  39,   9.0,  4.5, 0, 0, false},
+  // Fase 2:
+  // {"Tinaco de la casa",  18,  36,  14.0,  4.5, 0, 0, false},
+  // {"Bebedero caballos",  21,  16,   9.0,  4.5, 0, 0, false},
+  // {"Bebedero cerdos",    22,  17,   9.0,  4.5, 0, 0, false},
+};
+const int N_DEP = sizeof(dep) / sizeof(dep[0]);
+
+// ================== 3. BOMBAS ==================
+struct Bomba {
+  const char* nombre;
+  int pin;
+  int origen;     // índice en dep[] (-1 si no tiene, ej. la red de agua)
+  int destino;    // índice en dep[]
+  bool on, bloqueada, manual;
+  unsigned long tVentana, esperaHasta;
+  float nivelVentana;
+};
+
+Bomba bom[] = {
+  // nombre          GPIO origen destino
+  {"B1 (pozo -&gt; reserva)",  25, 0, 1, false, false, false, 0, 0, 0},
+  {"B2 (reserva -&gt; vacas)", 26, 1, 2, false, false, false, 0, 0, 0},
+  // Fase 2 (con un módulo de más canales):
+  // {"V0 (red -&gt; pozo)",       23, -1, 0, false, false, false, 0, 0, 0},
+  // {"B3 (reserva -&gt; caballos)",27, 1, 4, false, false, false, 0, 0, 0},
+  // {"B4 (reserva -&gt; cerdos)", 32, 1, 5, false, false, false, 0, 0, 0},
+  // {"B5 (reserva -&gt; casa)",   33, 1, 3, false, false, false, 0, 0, 0},
+};
+const int N_BOM = sizeof(bom) / sizeof(bom[0]);
+
+bool modoAuto = true;
+WebServer server(80);
+
+// ================== 4. ALERTAS ==================
+const int N_ALERTAS = 8;
+String alertas[N_ALERTAS];
+int alertaPos = 0;
+
+void alerta(const String&amp; txt) {
+  String linea = "[" + String(millis() / 1000) + " s] " + txt;
+  Serial.println(linea);
+  alertas[alertaPos] = linea;
+  alertaPos = (alertaPos + 1) % N_ALERTAS;
+}
+
+// ================== 5. SENSORES ==================
+float medirCm(int trig, int echo) {
+  digitalWrite(trig, LOW);
+  delayMicroseconds(3);
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+  unsigned long us = pulseIn(echo, HIGH, 30000UL);  // máx. ~5 m
+  if (us == 0) return -1;
+  return us * 0.0343 / 2.0;
+}
+
+// 5 lecturas y se queda con la del medio (quita lecturas locas)
+float medianaCm(int trig, int echo) {
+  float v[5];
+  int n = 0;
+  for (int i = 0; i &lt; 5; i++) {
+    float d = medirCm(trig, echo);
+    if (d &gt; 1.5 &amp;&amp; d &lt; 400) v[n++] = d;
+    delay(25);
+  }
+  if (n &lt; 3) return -1;
+  for (int i = 1; i &lt; n; i++) {        // ordenar
+    float k = v[i];
+    int j = i - 1;
+    while (j &gt;= 0 &amp;&amp; v[j] &gt; k) { v[j + 1] = v[j]; j--; }
+    v[j + 1] = k;
+  }
+  return v[n / 2];
+}
+
+void leerDeposito(int i) {
+  Deposito&amp; d = dep[i];
+  float cm = medianaCm(d.trig, d.echo);
+  bool antes = d.ok;
+  if (cm &lt; 0) {
+    d.ok = false;
+    if (antes) alerta(String("Sensor de ") + d.nombre + " sin lectura. Revisa VCC, GND, TRIG y ECHO.");
+    return;
+  }
+  d.ok = true;
+  d.cm = cm;
+  float pct = (d.cmVacio - cm) / (d.cmVacio - d.cmLleno) * 100.0;
+  d.nivel = constrain(pct, 0.0f, 100.0f);
+  if (!antes) alerta(String("Sensor de ") + d.nombre + " OK: " + String(cm, 1) + " cm");
+}
+
+// ================== 6. BOMBAS ==================
+int bombasEncendidas() {
+  int n = 0;
+  for (int i = 0; i &lt; N_BOM; i++) if (bom[i].on) n++;
+  return n;
+}
+
+void apagar(int i, const String&amp; motivo) {
+  Bomba&amp; b = bom[i];
+  if (!b.on) return;
+  b.on = false;
+  b.manual = false;
+  digitalWrite(b.pin, RELE_OFF);
+  alerta(String(b.nombre) + " apagada: " + motivo);
+}
+
+bool origenOk(const Bomba&amp; b, float margen) {
+  if (b.origen &lt; 0) return true;
+  const Deposito&amp; o = dep[b.origen];
+  return o.ok &amp;&amp; o.nivel &gt; NIVEL_SECO + margen;
+}
+
+bool encender(int i, bool manual) {
+  Bomba&amp; b = bom[i];
+  Deposito&amp; d = dep[b.destino];
+  if (b.on) return true;
+  if (b.bloqueada) { if (manual) alerta(String(b.nombre) + " bloqueada por posible fuga. Repara y presiona Rearmar."); return false; }
+  if (!d.ok) { if (manual) alerta(String("No se puede llenar ") + d.nombre + ": su sensor no responde."); return false; }
+  if (d.nivel &gt;= NIVEL_APAGAR) { if (manual) alerta(String(d.nombre) + " ya está lleno. La bomba no se enciende."); return false; }
+  if (!origenOk(b, 0)) { if (manual) alerta(String("No hay agua suficiente en el origen de ") + b.nombre + "."); return false; }
+  if (bombasEncendidas() &gt;= MAX_BOMBAS_A_LA_VEZ) { if (manual) alerta(String("Ya hay ") + String(MAX_BOMBAS_A_LA_VEZ) + " bombas encendidas. Espera a que termine una."); return false; }
+  b.on = true;
+  b.manual = manual;
+  b.tVentana = millis();
+  b.nivelVentana = d.nivel;
+  digitalWrite(b.pin, RELE_ON);
+  alerta(String(b.nombre) + (manual ? " encendida a mano" : " encendida (nivel bajo)") + ". Se apaga sola al " + String((int)NIVEL_APAGAR) + "%.");
+  return true;
+}
+
+// ¿otra bomba encendida saca agua del destino de esta? (entonces no se puede juzgar si sube)
+bool destinoSeVacia(int i) {
+  for (int k = 0; k &lt; N_BOM; k++)
+    if (k != i &amp;&amp; bom[k].on &amp;&amp; bom[k].origen == bom[i].destino) return true;
+  return false;
+}
+
+void controlar() {
+  unsigned long ahora = millis();
+  for (int i = 0; i &lt; N_BOM; i++) {
+    Bomba&amp; b = bom[i];
+    Deposito&amp; d = dep[b.destino];
+
+    if (b.on) {
+      if (!d.ok) { apagar(i, String("el sensor de ") + d.nombre + " no responde"); continue; }
+      if (b.origen &gt;= 0 &amp;&amp; !dep[b.origen].ok) { apagar(i, "el sensor del origen no responde"); continue; }
+      if (d.nivel &gt;= NIVEL_APAGAR) { apagar(i, String(d.nombre) + " lleno"); continue; }
+      if (!origenOk(b, 0)) { apagar(i, "origen casi vacío (protección contra trabajo en seco)"); continue; }
+
+      // detección de fuga
+      if (destinoSeVacia(i)) { b.tVentana = ahora; b.nivelVentana = d.nivel; continue; }
+      if (ahora - b.tVentana &gt;= VENTANA_FUGA_MS) {
+        float subio = d.nivel - b.nivelVentana;
+        if (subio &lt; SUBIDA_MINIMA) {
+          apagar(i, "posible fuga");
+          b.bloqueada = true;
+          alerta(String("CUIDADO: ") + b.nombre + " estuvo " + String(VENTANA_FUGA_MS / 1000) +
+                 " s encendida y " + d.nombre + " no subió. Puede haber una manguera rota o suelta.");
+          // si se bloquean varias bombas del mismo origen, el problema es el tramo común
+          int mismas = 0;
+          for (int k = 0; k &lt; N_BOM; k++) if (bom[k].bloqueada &amp;&amp; bom[k].origen == b.origen) mismas++;
+          if (mismas &gt;= 2) alerta("Varias bombas del mismo depósito no logran subir el nivel: revisa la manguera principal.");
+        } else {
+          b.tVentana = ahora;
+          b.nivelVentana = d.nivel;
+        }
+      }
+    } else if (modoAuto &amp;&amp; !b.bloqueada &amp;&amp; ahora &gt;= b.esperaHasta &amp;&amp; d.ok &amp;&amp; d.nivel &lt;= NIVEL_ENCENDER &amp;&amp; origenOk(b, 5)) {
+      encender(i, false);
+    }
+  }
+}
+
+// ================== 7. PÁGINA WEB (la "app") ==================
+String paginaHtml() {
+  String h;
+  h.reserve(4000);
+  h += F("&lt;!doctype html&gt;&lt;html lang='es'&gt;&lt;head&gt;&lt;meta charset='utf-8'&gt;&lt;meta name='viewport' content='width=device-width,initial-scale=1'&gt;"
+         "&lt;meta http-equiv='refresh' content='3'&gt;&lt;title&gt;Monitor Hidrico&lt;/title&gt;&lt;style&gt;"
+         "body{font-family:system-ui,sans-serif;background:#0d171d;color:#e3edf2;margin:0;padding:16px}"
+         "h1{font-size:20px;margin:0 0 12px}.c{background:#16252e;border-radius:10px;padding:12px;margin-bottom:10px}"
+         ".bar{height:10px;background:#2a3a44;border-radius:5px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;background:#4ab6e6}"
+         "a{display:inline-block;margin:4px 6px 0 0;padding:6px 10px;border-radius:6px;background:#1d7fb3;color:#fff;text-decoration:none;font-size:14px}"
+         "a.g{background:#2a3a44}.b{color:#f0604f;font-weight:600}.m{color:#8fa7b4;font-size:13px}&lt;/style&gt;&lt;/head&gt;&lt;body&gt;");
+  h += F("&lt;h1&gt;Monitor Hídrico&lt;/h1&gt;");
+  h += "&lt;div class='c'&gt;Modo: &lt;b&gt;" + String(modoAuto ? "automático" : "manual") + "&lt;/b&gt; &lt;a class='g' href='/auto'&gt;Cambiar&lt;/a&gt;&lt;/div&gt;";
+  for (int i = 0; i &lt; N_DEP; i++) {
+    Deposito&amp; d = dep[i];
+    h += "&lt;div class='c'&gt;&lt;b&gt;" + String(d.nombre) + "&lt;/b&gt; ";
+    if (d.ok) {
+      String estado = d.nivel &lt;= NIVEL_ENCENDER ? "BAJO" : (d.nivel &gt;= 75 ? "ALTO" : "MEDIO");
+      h += String(d.nivel, 0) + "% · " + estado + "&lt;div class='bar'&gt;&lt;i style='width:" + String(d.nivel, 0) + "%'&gt;&lt;/i&gt;&lt;/div&gt;";
+      h += "&lt;span class='m'&gt;HC-SR04: " + String(d.cm, 1) + " cm&lt;/span&gt;";
+    } else {
+      h += "&lt;span class='b'&gt;sin lectura del sensor&lt;/span&gt;";
+    }
+    for (int k = 0; k &lt; N_BOM; k++) {
+      if (bom[k].destino != i) continue;
+      Bomba&amp; b = bom[k];
+      h += "&lt;div class='m'&gt;" + String(b.nombre) + ": ";
+      h += b.bloqueada ? "&lt;span class='b'&gt;BLOQUEADA (posible fuga)&lt;/span&gt;" : (b.on ? "encendida" : "apagada");
+      h += "&lt;/div&gt;&lt;a href='/llenar?b=" + String(k) + "'&gt;Llenar&lt;/a&gt;&lt;a class='g' href='/detener?b=" + String(k) + "'&gt;Detener&lt;/a&gt;";
+      if (b.bloqueada) h += "&lt;a class='g' href='/rearmar?b=" + String(k) + "'&gt;Rearmar&lt;/a&gt;";
+    }
+    h += "&lt;/div&gt;";
+  }
+  h += F("&lt;div class='c'&gt;&lt;b&gt;Alertas&lt;/b&gt;");
+  for (int j = 1; j &lt;= N_ALERTAS; j++) {
+    String&amp; a = alertas[(alertaPos - j + N_ALERTAS) % N_ALERTAS];
+    if (a.length()) h += "&lt;div class='m'&gt;" + a + "&lt;/div&gt;";
+  }
+  h += F("&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;");
+  return h;
+}
+
+String datosJson() {
+  String j = "{\"modo\":\"" + String(modoAuto ? "auto" : "manual") + "\",\"depositos\":[";
+  for (int i = 0; i &lt; N_DEP; i++) {
+    if (i) j += ",";
+    j += "{\"nombre\":\"" + String(dep[i].nombre) + "\",\"ok\":" + String(dep[i].ok ? "true" : "false") +
+         ",\"nivel\":" + String(dep[i].nivel, 1) + ",\"cm\":" + String(dep[i].cm, 1) + "}";
+  }
+  j += "],\"bombas\":[";
+  for (int k = 0; k &lt; N_BOM; k++) {
+    if (k) j += ",";
+    j += "{\"nombre\":\"" + String(bom[k].nombre) + "\",\"on\":" + String(bom[k].on ? "true" : "false") +
+         ",\"bloqueada\":" + String(bom[k].bloqueada ? "true" : "false") + "}";
+  }
+  j += "]}";
+  return j;
+}
+
+int bombaDeUrl() {
+  if (!server.hasArg("b")) return -1;
+  int k = server.arg("b").toInt();
+  return (k &gt;= 0 &amp;&amp; k &lt; N_BOM) ? k : -1;
+}
+void volver() { server.sendHeader("Location", "/"); server.send(303); }
+
+void configurarWeb() {
+  server.on("/", []() { server.send(200, "text/html; charset=utf-8", paginaHtml()); });
+  server.on("/datos", []() { server.send(200, "application/json", datosJson()); });
+  server.on("/llenar", []() { int k = bombaDeUrl(); if (k &gt;= 0) encender(k, true); volver(); });
+  server.on("/detener", []() {
+    int k = bombaDeUrl();
+    if (k &gt;= 0) { apagar(k, "detenida a mano"); bom[k].esperaHasta = millis() + 60000; }
+    volver();
+  });
+  server.on("/rearmar", []() {
+    int k = bombaDeUrl();
+    if (k &gt;= 0) { bom[k].bloqueada = false; alerta(String(bom[k].nombre) + " rearmada."); }
+    volver();
+  });
+  server.on("/auto", []() { modoAuto = !modoAuto; alerta(modoAuto ? "Modo automático" : "Modo manual"); volver(); });
+  server.begin();
+}
+
+// ================== 8. SETUP Y LOOP ==================
+void setup() {
+  // Primero los relés en apagado, antes que cualquier otra cosa
+  for (int k = 0; k &lt; N_BOM; k++) { digitalWrite(bom[k].pin, RELE_OFF); pinMode(bom[k].pin, OUTPUT); digitalWrite(bom[k].pin, RELE_OFF); }
+  for (int i = 0; i &lt; N_DEP; i++) { pinMode(dep[i].trig, OUTPUT); digitalWrite(dep[i].trig, LOW); pinMode(dep[i].echo, INPUT); }
+
+  Serial.begin(115200);
+  delay(300);
+  Serial.println("\n=== Monitor Hidrico ===");
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("Conectando al WiFi");
+  unsigned long t0 = millis();
+  while (WiFi.status() != WL_CONNECTED &amp;&amp; millis() - t0 &lt; 10000) { delay(300); Serial.print("."); }
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("\nListo. Abre en el celular: http://");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\nSin WiFi por ahora. El control funciona igual; se reintenta solo.");
+  }
+  configurarWeb();
+}
+
+unsigned long tSensor = 0, tControl = 0, tWifi = 0, tSerial = 0;
+int sensorTurno = 0;
+bool teniaWifi = false;
+
+void loop() {
+  server.handleClient();
+  unsigned long ahora = millis();
+
+  // un sensor cada 150 ms (así no se cruzan los ecos y la página responde rápido)
+  if (ahora - tSensor &gt;= 150) {
+    tSensor = ahora;
+    leerDeposito(sensorTurno);
+    sensorTurno = (sensorTurno + 1) % N_DEP;
+  }
+  if (ahora - tControl &gt;= 500) { tControl = ahora; controlar(); }
+
+  // WiFi: avisa y reintenta
+  bool hayWifi = WiFi.status() == WL_CONNECTED;
+  if (hayWifi != teniaWifi) {
+    if (hayWifi) alerta(String("WiFi conectado: http://") + WiFi.localIP().toString());
+    else alerta(String("Se perdió el WiFi. El control sigue funcionando."));
+    teniaWifi = hayWifi;
+  }
+  if (!hayWifi &amp;&amp; ahora - tWifi &gt;= 10000) { tWifi = ahora; WiFi.reconnect(); }
+
+  // lecturas en el Monitor Serie cada 2 s (para calibrar)
+  if (ahora - tSerial &gt;= 2000) {
+    tSerial = ahora;
+    for (int i = 0; i &lt; N_DEP; i++) {
+      Serial.print(dep[i].nombre); Serial.print(": ");
+      if (dep[i].ok) { Serial.print(dep[i].cm, 1); Serial.print(" cm = "); Serial.print(dep[i].nivel, 0); Serial.print("%"); }
+      else Serial.print("sin lectura");
+      Serial.print(i &lt; N_DEP - 1 ? "  |  " : "\n");
+    }
+  }
+}
+</pre>
+  </div>
+
+  <h2 id="fase2">Fase 2: completar la maqueta</h2>
+  <div class="stack">
+    <div class="card">
+      <h3>Comprar</h3>
+      <ul>
+        <li>Módulo de relés de <b>5 V</b>, 8 canales (<code>SRD-05VDC-SL-C</code>). Su <code>VCC</code> va al riel 5 V y ya no se necesita el adaptador de 24 V.</li>
+        <li>2 mini bombas más (tienen 4; la maqueta usa 6).</li>
+        <li>Los HC-SR04 que falten para llegar a 6.</li>
+        <li>Unos 4 m más de manguera y cable de red (UTP) para los tramos largos.</li>
+        <li>Si los sensores necesitan 5 V: resistencias de 1 kΩ y 2 kΩ (una de cada por sensor).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Cambiar en el código</h3>
+      <p>Quita las barras <code>//</code> de las filas marcadas "Fase 2" en <code>dep[]</code> y <code>bom[]</code>. Si el nuevo módulo de 8 relés se activa con LOW (muchos lo hacen), cambia <code>RELE_ON</code> a <code>LOW</code> y <code>RELE_OFF</code> a <code>HIGH</code>.</p>
+    </div>
+  </div>
+
+  <footer>
+    <p>Código revisado con un compilador de C++ contra una copia simplificada de las librerías de Arduino. Verifíquenlo en su Arduino IDE con <b>Verificar</b> antes de subirlo.</p>
+  </footer>
+</div>
+<script>
+  document.getElementById('copyBtn').addEventListener('click', function () {
+    var b = this, txt = document.getElementById('code').textContent;
+    function done(ok) { b.textContent = ok ? 'Copiado' : 'Selecciona y copia'; setTimeout(function () { b.textContent = 'Copiar código'; }, 2000); }
+    function fallback() { var r = document.createRange(); r.selectNodeContents(document.getElementById('code')); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); done(false); }
+    try { navigator.clipboard.writeText(txt).then(function () { done(true); }, fallback); } catch (e) { fallback(); }
+  });
+</script>
+</body>
+</html>

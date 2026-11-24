@@ -6,6 +6,10 @@ Representación 3D interactiva del proyecto IoT de agua para la granja: pozo, ta
 
 Abre `index.html` (simulación de la granja) o `maqueta.html` (maqueta física) en Chrome, Edge o Firefox. Necesita internet porque carga Three.js desde un CDN. Cada página tiene un botón para pasar a la otra.
 
+## Guía de conexión (`guia-conexion.html`) y código (`firmware/`)
+
+Paso a paso para conectar las piezas reales (ESP32, relé de 2 canales, MB102, mini bombas, HC-SR04), con los problemas de voltaje resueltos: los relés del módulo son de 24 V (`SRD-24VDC`), el ESP32 trabaja a 3.3 V y el MB102 no aguanta más de 2 bombas a la vez. El programa para el ESP32 está en `firmware/monitor_hidrico/monitor_hidrico.ino` (fase 1: 3 sensores y 2 bombas).
+
 ## Maqueta (`maqueta.html`)
 
 Cómo se vería la maqueta real a escala (1 unidad = 1 cm): una plancha de hielo seco de 100 × 60 cm elevada sobre 4 soportes de 15 cm, con botellas PET cortadas como pozo, red de agua, tanque de reserva, tinaco y bebederos. Los cables pasan por debajo de la plancha.

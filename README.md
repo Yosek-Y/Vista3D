@@ -12,7 +12,7 @@ Paso a paso para conectar las piezas reales (ESP32, relé de 2 canales, MB102, m
 
 ## Conexión de prueba (`conexion-3d.html`)
 
-Vista 3D de la prueba en la mesa: protoboard con MB102, ESP32, relé HW-316, 1 sensor y 2 bombas en vasos. Al tocar una pieza se iluminan sus cables y aparece a dónde va cada uno. La pestaña "Lista para conectar" sirve para ir marcando los cables en orden. El programa de esta prueba está en `micropython/prueba_1_sensor.py`.
+Vista 3D de la prueba en la mesa: protoboard con MB102, ESP32, relé HW-316, 2 sensores y 2 bombas en vasos. Al tocar una pieza se iluminan sus cables y aparece a dónde va cada uno. La pestaña "Lista para conectar" sirve para ir marcando los cables en orden. El programa de esta prueba está en `micropython/prueba_2_sensores.py` (y la versión de 1 sensor en `micropython/prueba_1_sensor.py`).
 
 ## Maqueta (`maqueta.html`)
 

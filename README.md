@@ -8,13 +8,13 @@ Abre `index.html` (simulación de la granja) o `maqueta.html` (maqueta física) 
 
 ## Guía de conexión (`guia-conexion.html`) y código (`firmware/`)
 
-Paso a paso para conectar las piezas reales (ESP32, relé de 2 canales, MB102, mini bombas, HC-SR04), con los problemas de voltaje resueltos: los relés del módulo son de 24 V (`SRD-24VDC`), el ESP32 trabaja a 3.3 V y el MB102 no aguanta más de 2 bombas a la vez. Versión básica: pozo → tanque central → bebedero y casa, con 3 bombas, 3 sensores (el pozo no lleva) y un módulo de 4 relés de 5 V. El programa está en `firmware/monitor_hidrico/monitor_hidrico.ino`.
+Paso a paso para conectar las piezas reales (ESP32, relé de 2 canales, MB102, mini bombas, HC-SR04), con los problemas de voltaje resueltos: los relés del módulo son de 24 V (`SRD-24VDC`), el ESP32 trabaja a 3.3 V y el MB102 no aguanta más de 2 bombas a la vez. Versión básica: pozo → tanque central → bebedero 1 y bebedero 2, con 3 bombas, 3 sensores (el pozo no lleva) y el módulo de 4 relés HW-316 de 5 V (se activa con LOW). El programa está en `firmware/monitor_hidrico/monitor_hidrico.ino`.
 
 ## Maqueta (`maqueta.html`)
 
-Cómo se vería la maqueta real a escala (1 unidad = 1 cm): una plancha de hielo seco de 100 × 60 cm elevada sobre 4 soportes de 15 cm, con botellas PET cortadas como pozo, red de agua, tanque de reserva, tinaco y bebederos. Los cables pasan por debajo de la plancha.
+La maqueta real de la versión básica a escala (1 unidad = 1 cm), hecha a partir de la foto de su base: plancha de hielo seco de ≈ 65 × 80 cm sobre 4 soportes y la lámina café, pozo (botella hundida), tanque central (galón cortado) y 2 bebederos (botellas acostadas, la manguera entra por la tapa) en corrales con cerca roja. Muestra dónde va el ESP32, el relé, el MB102, los sensores, las bombas, las mangueras y los cables por debajo.
 
-- **Armado**: 12 pasos en orden. Cada paso mueve la cámara e ilumina las piezas que usa.
+- **Armado**: 11 pasos en orden, empezando por probar la electrónica en la mesa. Cada paso mueve la cámara e ilumina las piezas que usa.
 - **Pieza**: toca cualquier pieza para ver material, medidas, cómo hacerla y cómo se conecta.
 - **Materiales**: lista de compras y el largo de manguera y cable calculado desde el modelo.
 - **Cables**: cada tramo de cable con sus pines del ESP32 y su largo.

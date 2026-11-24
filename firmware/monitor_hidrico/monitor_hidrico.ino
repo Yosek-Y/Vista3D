@@ -2,11 +2,11 @@
   Monitor Hídrico · Maqueta IoT con ESP32
   ---------------------------------------
   MAQUETA BÁSICA (3 bombas):
-    - 3 sensores HC-SR04: tanque central, bebedero y tinaco de la casa (el pozo no lleva sensor)
-    - 1 módulo de 4 relés de 5 V (se usan 3 canales):
-        B1: pozo -> tanque central
-        B2: tanque central -> bebedero
-        B3: tanque central -> casa
+    - 3 sensores HC-SR04: tanque central, bebedero 1 y bebedero 2 (el pozo no lleva sensor)
+    - 1 módulo de 4 relés de 5 V HW-316 (se usan 3 canales):
+        B1: pozo -> tanque central          (IN1, GPIO 25)
+        B2: tanque central -> bebedero 1    (IN2, GPIO 26)
+        B3: tanque central -> bebedero 2    (IN3, GPIO 27)
 
   Qué hace:
     - Mide el nivel de cada depósito (%) con el ultrasonido.
@@ -31,10 +31,10 @@
 const char* WIFI_SSID = "NOMBRE_DE_TU_WIFI";
 const char* WIFI_PASS = "CLAVE_DE_TU_WIFI";
 
-// Jumper del módulo de relé en "High": el relé se activa con HIGH (recomendado).
-// Si lo pones en "Low", cambia estas dos líneas (ON = LOW, OFF = HIGH).
-#define RELE_ON  HIGH
-#define RELE_OFF LOW
+// El módulo HW-316 se activa con LOW: el relé se enciende cuando el pin del ESP32 está en 0 V.
+// Si usan un módulo que se activa con HIGH, inviertan estas dos líneas.
+#define RELE_ON  LOW
+#define RELE_OFF HIGH
 
 const float NIVEL_ENCENDER = 30.0;   // % : debajo de esto se enciende la bomba (modo automático)
 const float NIVEL_APAGAR   = 90.0;   // % : al llegar aquí se apaga sola
@@ -58,9 +58,9 @@ struct Deposito {
 
 Deposito dep[] = {
   // nombre               TRIG ECHO  vacío lleno
-  {"Tanque central",       5,  35,  25.0,  5.0, 0, 0, false},   // índice 0
-  {"Bebedero",            19,  39,   9.0,  4.5, 0, 0, false},   // índice 1
-  {"Tinaco de la casa",   18,  36,  14.0,  4.5, 0, 0, false},   // índice 2
+  {"Tanque central",       5,  35,  21.0,  5.0, 0, 0, false},   // índice 0
+  {"Bebedero 1",          19,  39,  13.0,  5.0, 0, 0, false},   // índice 1 (corral derecho)
+  {"Bebedero 2",          18,  36,  13.0,  5.0, 0, 0, false},   // índice 2 (corral izquierdo)
 };
 const int N_DEP = sizeof(dep) / sizeof(dep[0]);
 
@@ -78,8 +78,8 @@ struct Bomba {
 Bomba bom[] = {
   // nombre          GPIO origen destino
   {"B1 (pozo -> tanque)",     25, -1, 0, false, false, false, 0, 0, 0},  // relé IN1 (el pozo no tiene sensor)
-  {"B2 (tanque -> bebedero)", 26,  0, 1, false, false, false, 0, 0, 0},  // relé IN2
-  {"B3 (tanque -> casa)",     27,  0, 2, false, false, false, 0, 0, 0},  // relé IN3
+  {"B2 (tanque -> bebedero 1)", 26, 0, 1, false, false, false, 0, 0, 0},  // relé IN2
+  {"B3 (tanque -> bebedero 2)", 27, 0, 2, false, false, false, 0, 0, 0},  // relé IN3
 };
 const int N_BOM = sizeof(bom) / sizeof(bom[0]);
 

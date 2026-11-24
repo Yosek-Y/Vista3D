@@ -8,7 +8,7 @@ Abre `index.html` (simulación de la granja) o `maqueta.html` (maqueta física) 
 
 ## Guía de conexión (`guia-conexion.html`) y código (`firmware/`)
 
-Paso a paso para conectar las piezas reales (ESP32, relé de 2 canales, MB102, mini bombas, HC-SR04), con los problemas de voltaje resueltos: los relés del módulo son de 24 V (`SRD-24VDC`), el ESP32 trabaja a 3.3 V y el MB102 no aguanta más de 2 bombas a la vez. Versión básica: pozo → tanque central → bebedero 1 y bebedero 2, con 3 bombas, 3 sensores (el pozo no lleva) y el módulo de 4 relés HW-316 de 5 V (se activa con LOW). El programa está en `firmware/monitor_hidrico/monitor_hidrico.ino`.
+Paso a paso para conectar las piezas reales (ESP32, relé de 2 canales, MB102, mini bombas, HC-SR04), con los problemas de voltaje resueltos: los relés del módulo son de 24 V (`SRD-24VDC`), el ESP32 trabaja a 3.3 V y el MB102 no aguanta más de 2 bombas a la vez. Versión básica: pozo → tanque central → bebedero 1 y bebedero 2, con 3 bombas, 3 sensores (el pozo no lleva) y el módulo de 4 relés HW-316 de 5 V (se activa con LOW). El programa está en `firmware/monitor_hidrico/monitor_hidrico.ino`. Para probar solo las bombas y los relés antes de armar todo, usa `firmware/prueba_bombas/prueba_bombas.ino`: enciende B1, B2 y B3 una por una 3 s, y luego puedes escribir 1, 2, 3 (una bomba), 0 (apagar todo) o t (repetir) en el Monitor Serie.
 
 ## Maqueta (`maqueta.html`)
 

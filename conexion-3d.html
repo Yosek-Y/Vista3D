@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conexión de Prueba 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: la mesa de prueba en 3D a pantalla completa; barra arriba; panel a la izquierda (abajo en móvil) con los cables de la pieza tocada y una lista para ir marcando.
+   Mismo sistema visual oscuro que la simulación y la maqueta (un solo tema, elegido a propósito). */
+:root{
+  --bg:#0d171d; --panel:rgba(13,24,31,.93); --raise:rgba(180,215,232,.06); --line:rgba(173,205,222,.15);
+  --ink:#e3edf2; --muted:#8fa7b4; --water:#4ab6e6; --water-deep:#1d7fb3; --ok:#4fc58e; --warn:#efb23d;
+  --f-display:'Barlow Semi Condensed','Arial Narrow',system-ui,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Consolas,monospace;
+  --topbar-h:64px; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+code{font-family:var(--f-mono);font-size:12px;background:rgba(0,0,0,.25);padding:1px 5px;border-radius:4px}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+#topbar{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
+  padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:var(--panel);border-bottom:1px solid var(--line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand-mark{width:30px;height:30px;flex:none}
+.brand h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:21px;line-height:1}
+.brand small{display:block;color:var(--muted);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.tb-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tb-spacer{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--raise);border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap;color:var(--ink);transition:background .15s}
+.btn:hover{background:rgba(180,215,232,.12)}
+.btn:focus-visible,.tab:focus-visible,.collapse-btn:focus-visible,.crow:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+.btn[aria-pressed="true"]{background:var(--water-deep);border-color:transparent;color:#fff}
+.btn svg{width:15px;height:15px;flex:none}
+#panel{position:fixed;z-index:15;top:calc(var(--topbar-h) + 12px);left:max(12px,env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  width:400px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden}
+body.clean #panel{display:none}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tab{flex:1;background:none;border:0;padding:11px 4px 10px;cursor:pointer;color:var(--muted);font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.02em;border-bottom:2px solid transparent}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--water)}
+.collapse-btn{flex:none;width:40px;background:none;border:0;border-left:1px solid var(--line);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.collapse-btn svg{width:18px;height:18px;transition:transform .2s}
+.views{flex:1;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:transparent transparent}
+.views:hover{scrollbar-color:rgba(173,205,222,.35) transparent}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:transparent;border-radius:6px}
+:hover::-webkit-scrollbar-thumb{background:rgba(173,205,222,.35)}
+.view{padding:14px 14px 22px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:12px}
+.card h3{margin:0 0 4px;font-family:var(--f-display);font-weight:600;font-size:18px}
+.hint{color:var(--muted);font-size:12.5px;margin:0}
+p{margin:0}
+.pieces{display:flex;flex-wrap:wrap;gap:6px}
+.pieces button{border:1px solid var(--line);background:var(--raise);border-radius:999px;padding:5px 11px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+.pieces button[aria-pressed="true"]{background:var(--water-deep);border-color:transparent}
+.conn{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.crow{display:grid;grid-template-columns:14px 1fr auto;gap:2px 10px;align-items:start;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:9px 11px;cursor:pointer;width:100%;text-align:left;color:var(--ink)}
+.crow:hover{border-color:rgba(74,182,230,.5)}
+.crow.sel{border-color:var(--water);background:rgba(74,182,230,.08)}
+.crow .sw{width:12px;height:12px;border-radius:3px;margin-top:4px}
+.crow .main{min-width:0}
+.crow .main .pin{display:block;font-family:var(--f-mono);font-weight:500;font-size:13.5px}
+.crow .main .to{display:block;font-size:13px}
+.crow .main .nt{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.crow .type{font-family:var(--f-mono);font-size:11px;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.08);white-space:nowrap}
+.arrow{color:var(--water);margin:0 4px}
+.tip{padding:9px 11px;border-radius:9px;background:rgba(239,178,61,.12);color:#f6d79a;font-size:12.5px}
+.check{display:grid;grid-template-columns:auto 14px 1fr;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.check:first-child{border-top:0}
+.check input{width:18px;height:18px;accent-color:var(--ok)}
+.check .sw{width:12px;height:12px;border-radius:3px}
+.check.done span.t{color:var(--muted);text-decoration:line-through}
+.group-t{font-family:var(--f-display);font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:6px}
+.prog{height:8px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--ok);transition:width .2s}
+#labels{position:fixed;inset:0;pointer-events:none;z-index:5;overflow:hidden}
+body.nolabels #labels .tag:not(.pin){display:none}
+.tag{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;background:rgba(12,22,28,.88);border:1px solid rgba(173,205,222,.22);border-radius:8px;padding:4px 8px;white-space:nowrap;font-size:12px;line-height:1.3;will-change:transform}
+.tag::after{content:"";position:absolute;left:50%;bottom:-5px;width:8px;height:8px;background:inherit;border-right:1px solid rgba(173,205,222,.22);border-bottom:1px solid rgba(173,205,222,.22);transform:translateX(-50%) rotate(45deg)}
+.tag b{font-weight:600}
+.tag.sel{border-color:var(--water);box-shadow:0 0 0 2px rgba(74,182,230,.35)}
+.tag.pin{pointer-events:none;font-family:var(--f-mono);font-size:11px;padding:2px 6px;background:rgba(29,127,179,.92);border-color:transparent;color:#fff}
+.tag.pin::after{display:none}
+#loading{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--muted);font-family:var(--f-display);font-size:18px;text-align:center;padding:0 24px}
+@media (min-width:761px){
+  #panel.collapsed{bottom:auto}
+  #panel.collapsed .views{display:none}
+  #panel.collapsed .tabs{border-bottom:0}
+  #panel.collapsed .collapse-btn svg{transform:rotate(180deg)}
+}
+@media (max-width:760px){
+  .brand small,.btn .t{display:none}
+  .brand h1{font-size:18px}
+  .tb-spacer{display:none}
+  #panel{top:auto;left:0;right:0;width:auto;bottom:0;height:52%;border-radius:14px 14px 0 0;border-bottom:0;
+    padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px);transition:transform .25s ease}
+  #panel:not(.collapsed) .collapse-btn svg{transform:rotate(180deg)}
+  #panel.collapsed{transform:translateY(calc(100% - 46px - env(safe-area-inset-bottom,0px)))}
+  .view{padding-left:16px;padding-right:16px}
+  .tag{font-size:11px;padding:3px 6px}
+}
+@media (prefers-reduced-motion: reduce){ #panel{transition:none} .prog i{transition:none} }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="scene" tabindex="0" aria-label="Mesa de prueba en 3D: protoboard con MB102, ESP32, relé de 4 canales, 2 sensores HC-SR04 y 2 bombas en vasos con agua, con todos sus cables"></canvas>
+<div id="labels"></div>
+
+<header id="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="12" width="24" height="9" rx="1.5" fill="#e9ecef"/><path d="M8 12c0-6 6-8 8-3M24 21c0 6-6 7-9 3" fill="none" stroke="#4ab6e6" stroke-width="2.2" stroke-linecap="round"/><path d="M6 14h20M6 19h20" stroke="#e5483d" stroke-width="1"/></svg>
+    <div><h1>Conexión de prueba</h1><small>2 sensores · 2 bombas · un solo GND común</small></div>
+  </div>
+  <div class="tb-group">
+    <button class="btn" id="vHome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span class="t">General</span></button>
+    <button class="btn" id="vTop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 12h16"/></svg><span class="t">Desde arriba</span></button>
+    <button class="btn" id="showAll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="t">Ver todos los cables</span></button>
+    <button class="btn" id="lblBtn" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="t">Nombres</span></button>
+  </div>
+  <div class="tb-spacer"></div>
+  <button class="btn" id="hideBtn" aria-pressed="false" title="Ocultar el panel (tecla H)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span class="t">Ocultar panel</span></button>
+</header>
+
+<aside id="panel" aria-label="Cables">
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-view="pieza">Pieza</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="lista">Lista para conectar</button>
+    <button class="collapse-btn" id="collapseBtn" aria-expanded="true" aria-label="Minimizar panel" title="Minimizar panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
+  </div>
+  <div class="views">
+    <section class="view" id="view-pieza">
+      <p class="hint">Toca una pieza en la escena o elígela aquí: se iluminan sus cables y aparece el nombre de cada pin.</p>
+      <div class="pieces" id="pieceBtns"></div>
+      <div id="pieceInfo"></div>
+    </section>
+    <section class="view" id="view-lista" hidden>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h3>Conectados</h3><span class="hint" id="progTxt">0 de 0</span></div>
+        <div class="prog"><i id="progBar" style="width:0"></i></div>
+        <p class="hint" style="margin-top:8px">Conecten en este orden y marquen cada cable. Las marcas se guardan en este navegador.</p>
+      </div>
+      <div id="checklist"></div>
+      <button class="btn" id="resetChecks" style="align-self:flex-start">Desmarcar todo</button>
+    </section>
+  </div>
+</aside>
+<div id="loading"><div id="loadingText">Cargando la vista 3D…</div></div>
+<script>
+  setTimeout(function(){ if(!window.__sceneReady){ var t=document.getElementById('loadingText'); if(t) t.textContent='No se pudo cargar la librería 3D (Three.js). Revisa tu conexión a internet y recarga la página.'; } }, 12000);
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = s => document.querySelector(s);
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- escena (1 unidad = 1 cm, mesa en y = 0) ---------- */
+const canvas = $('#scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#d3d9dc');
+const camera = new THREE.PerspectiveCamera(40, 1, 0.3, 800);
+const HOME = { pos: V(10, 46, 48), target: V(-3, 0, 1) };
+camera.position.copy(HOME.pos);
+const controls = new OrbitControls(camera, canvas);
+controls.target.copy(HOME.target); controls.enableDamping = true; controls.minDistance = 6; controls.maxDistance = 160;
+controls.maxPolarAngle = Math.PI * 0.49;
+scene.add(new THREE.HemisphereLight('#ffffff', '#b8ad9e', 1.25));
+const sun = new THREE.DirectionalLight('#fff4e2', 1.9); sun.position.set(20, 60, 30); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 5, far: 150 }); sun.shadow.bias = -0.0005; scene.add(sun);
+
+const M = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, ...o });
+const MAT = { pcbBlue: M('#1f5fa8'), pcbBlack: M('#1d2125'), silver: M('#d3d7da', { metalness: 0.7, roughness: 0.3 }), black: M('#1b1c1f'), white: M('#efeee6', { roughness: 0.5 }), foam: M('#f1f1ee', { roughness: 0.95 }) };
+function mesh(geo, mat, x = 0, y = 0, z = 0, parent = scene, shadow = true) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (shadow) { m.castShadow = true; m.receiveShadow = true; } parent.add(m); return m; }
+const box = (w, h, d, mat, x, y, z, p, s) => mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z, p, s);
+const cyl = (rt, rb, h, mat, x, y, z, p, seg = 20, s) => mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat, x, y, z, p, s);
+{
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  g.fillStyle = '#b8936a'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 60; i++) { g.strokeStyle = `rgba(90,60,30,${0.08 + Math.random() * 0.1})`; g.lineWidth = 1 + Math.random() * 2; g.beginPath(); const y = Math.random() * 256; g.moveTo(0, y); g.bezierCurveTo(80, y + 6, 170, y - 6, 256, y + 3); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 4); t.colorSpace = THREE.SRGBColorSpace;
+  const table = mesh(new THREE.PlaneGeometry(120, 90), new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }), 0, 0, 2, scene, false); table.rotation.x = -Math.PI / 2; table.receiveShadow = true;
+}
+
+/* ---------- piezas ---------- */
+const PIECES = {}, clickables = [];
+function piece(id, name, anchor, desc, obj) {
+  PIECES[id] = { id, name, anchor, desc };
+  obj.traverse(o => { if (o.isMesh) { o.userData.piece = id; clickables.push(o); } });
+}
+
+// Protoboard + MB102. Rieles (texto en la textura): atrás 5 V, adelante 3.3 V.
+const BB = { w: 16.5, d: 5.5, y: 0.9 };
+const RAIL = { b5: -2.45, bG: -2.2, fG: 1.85, f33: 2.1 };   // z de cada riel
+const railPt = (rail, x) => V(x, BB.y + 0.05, RAIL[rail]);
+{
+  const g = new THREE.Group(); scene.add(g);
+  const c = document.createElement('canvas'); c.width = 330; c.height = 110; const x = c.getContext('2d');
+  x.fillStyle = '#f5f5f0'; x.fillRect(0, 0, 330, 110); x.fillStyle = '#c8c8c0';
+  for (let i = 0; i < 63; i++) for (let j = 0; j < 14; j++) { const yy = j < 2 ? 6 + j * 5 : j < 12 ? 24 + (j - 2) * 6.4 + (j >= 7 ? 4 : 0) : 92 + (j - 12) * 5; x.fillRect(6 + i * 5.1, yy, 2, 2); }
+  x.fillStyle = '#d33'; x.fillRect(4, 3, 322, 1.5); x.fillRect(4, 103, 322, 1.5); x.fillStyle = '#36c'; x.fillRect(4, 16, 322, 1.5); x.fillRect(4, 88, 322, 1.5);
+  x.font = 'bold 7px sans-serif'; x.fillStyle = '#d33'; x.fillText('+5V', 300, 11); x.fillText('+3.3V', 292, 100); x.fillStyle = '#36c'; x.fillText('GND', 300, 22); x.fillText('GND', 300, 87);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const mats = [M('#eeeeea'), M('#eeeeea'), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }), M('#eeeeea'), M('#eeeeea'), M('#eeeeea')];
+  const bm = new THREE.Mesh(new THREE.BoxGeometry(BB.w, BB.y, BB.d), mats); bm.position.y = BB.y / 2; bm.castShadow = bm.receiveShadow = true; g.add(bm);
+  const mb = new THREE.Group(); mb.position.set(-6.55, BB.y, 0); g.add(mb);
+  box(3.4, 0.16, 5.3, MAT.pcbBlack, 0, 0.35, 0, mb);
+  box(1.4, 0.7, 1.6, MAT.silver, -0.6, 0.75, 1.6, mb);
+  box(1.4, 1.1, 1.2, MAT.black, -0.6, 0.95, -2.0, mb);
+  box(0.8, 0.6, 0.8, M('#d8d6cf'), 0.7, 0.7, -0.4, mb);
+  box(0.35, 0.6, 0.7, M('#e5c330'), 1.1, 0.7, -1.9, mb); box(0.35, 0.6, 0.7, M('#e5c330'), 1.1, 0.7, 1.9, mb);
+  mesh(new THREE.SphereGeometry(0.14, 8, 8), M('#3ddc84', { emissive: '#3ddc84', emissiveIntensity: 1.2 }), 1.2, 0.55, 0.5, mb, false);
+  piece('proto', 'Protoboard + MB102', V(-2, 4, 0), 'El MB102 va en el extremo izquierdo. Jumper de atrás en <b>5V</b> (rieles de atrás) y el de adelante en <b>3.3</b> (rieles de adelante). Los dos rieles azules son GND y están unidos por el MB102: cualquiera sirve.', g);
+}
+
+// Cargador y computadora
+{
+  const g = new THREE.Group(); g.position.set(-24, 0, -4); scene.add(g); box(4.4, 4.4, 2.4, M('#f3f3f1'), 0, 2.2, 0, g);
+  piece('cargador', 'Cargador 5 V 2 A', V(-24, 7, -4), 'Cargador de pared con salida USB-A. Se conecta al MB102 con el cable azul USB-A a USB-A.', g);
+  const l = new THREE.Group(); l.position.set(12, 0, 24); l.rotation.y = -0.35; scene.add(l);
+  box(16, 0.8, 11, M('#5d646b', { metalness: 0.3 }), 0, 0.4, 0, l); const sc = box(16, 10, 0.5, M('#3a4046', { metalness: 0.3 }), 0, 5.4, 5.3, l); sc.rotation.x = -0.25;
+  piece('pc', 'Computadora', V(12, 12, 26), 'Por el USB-C se sube el programa y se ve la consola en Thonny. También alimenta al ESP32.', l);
+}
+
+// ESP32 (38 pines). Antena a la izquierda, USB-C a la derecha.
+const ESP = { x: -1, y: 1.3, z: 10 };
+const ROW_L = ['3V3', 'EN', 'VP (36)', 'VN (39)', '34', '35', '32', '33', '25', '26', '27', '14', '12', 'GND', '13', 'D2', 'D3', 'CMD', '5V'];   // fila que mira a la protoboard
+const ROW_R = ['GND', '23', '22', 'TX', 'RX', '21', 'GND', '19', '18', '5', '17', '16', '4', '0', '2', '15', 'D1', 'D0', 'CLK'];
+function espPin(name) {
+  let i = ROW_L.indexOf(name), side = -1; if (i < 0) { i = ROW_R.indexOf(name); side = 1; }
+  return V(ESP.x - 2.29 + i * 0.254, ESP.y + 0.45, ESP.z + side * 1.25);
+}
+{
+  const g = new THREE.Group(); g.position.set(ESP.x, 0, ESP.z); scene.add(g);
+  box(6.2, 1.1, 3.4, MAT.foam, 0, 0.55, 0, g);
+  box(5.5, 0.16, 2.8, MAT.pcbBlack, 0, ESP.y, 0, g);
+  box(1.6, 0.32, 1.8, MAT.silver, -1.3, ESP.y + 0.24, 0, g);
+  box(0.8, 0.16, 1.6, M('#22252a'), -2.4, ESP.y + 0.16, 0, g);
+  box(0.75, 0.3, 0.9, MAT.silver, 2.65, ESP.y + 0.2, 0, g);
+  for (const s of [-1, 1]) { box(4.85, 0.3, 0.25, MAT.black, 0, ESP.y + 0.2, s * 1.25, g); for (let i = 0; i < 19; i++) box(0.06, 0.22, 0.06, M('#d4b25a', { metalness: 0.6 }), -2.29 + i * 0.254, ESP.y + 0.45, s * 1.25, g, false); }
+  mesh(new THREE.SphereGeometry(0.1, 8, 8), M('#3aa6ff', { emissive: '#3aa6ff', emissiveIntensity: 1.2 }), 1.6, ESP.y + 0.12, 0.8, g, false);
+  piece('esp32', 'ESP32', V(ESP.x, 5, ESP.z), 'Fuera de la protoboard (es muy ancho), sobre un taquito de hielo seco. Solo manda señales: 7 cables. El orden de los pines puede variar según la placa: <b>guíense por el número impreso</b> junto a cada pin.', g);
+}
+
+// Relé HW-316: pines hacia la protoboard, bornes hacia atrás
+const RL = { x: 3, z: -10.5 };
+const HEADER = ['GND', 'IN1', 'IN2', 'IN3', 'IN4', 'VCC'];
+const relHeader = n => V(RL.x + 1.2 + HEADER.indexOf(n) * 0.4, 1.2, RL.z + 2.2);
+const kX = k => RL.x - 2.8 + (k - 1) * 1.87;
+const relScrew = (k, t) => V(kX(k) + ({ NO: -0.5, COM: 0, NC: 0.5 })[t], 1.25, RL.z - 2.5);
+const relLeds = {};
+{
+  const g = new THREE.Group(); scene.add(g);
+  box(7.5, 0.16, 5.0, MAT.pcbBlue, RL.x, 0.3, RL.z, g);
+  for (let k = 1; k <= 4; k++) {
+    box(1.55, 1.55, 1.9, M('#3a64b8', { roughness: 0.45 }), kX(k), 1.15, RL.z - 0.3, g);
+    box(1.7, 0.9, 0.9, M('#3446c4'), kX(k), 0.8, RL.z - 2.05, g);
+    for (const t of ['NO', 'COM', 'NC']) cyl(0.18, 0.18, 0.12, MAT.silver, relScrew(k, t).x, 1.25, RL.z - 2.05, g, 10, false);
+    relLeds[k] = mesh(new THREE.SphereGeometry(0.12, 8, 8), M('#5a1a14'), kX(k) + 0.5, 0.45, RL.z + 1.7, g, false);
+  }
+  HEADER.forEach((n, i) => box(0.12, 0.8, 0.12, M('#d4b25a', { metalness: 0.6 }), RL.x + 1.2 + i * 0.4, 0.8, RL.z + 2.2, g, false));
+  box(2.6, 0.3, 0.3, MAT.black, RL.x + 2.2, 0.45, RL.z + 2.2, g);
+  box(0.4, 0.4, 0.7, M('#f0c419'), RL.x + 3.3, 0.55, RL.z + 1.2, g);
+  piece('rele', 'Relé 4 canales (HW-316)', V(RL.x, 4.5, RL.z), 'Pines hacia la protoboard: <code>GND IN1 IN2 IN3 IN4 VCC</code>. Bornes hacia atrás: K1 y K2 se usan, K3 y K4 quedan libres. El jumper amarillo <code>JD-VCC</code> se queda puesto. En cada borne, <b>COM es el tornillo del medio</b>; confirmen NO con el multímetro (con el relé apagado, COM–NC suena y COM–NO no).', g);
+}
+
+// Sensores HC-SR04 acostados sobre un taquito, "ojos" hacia arriba, pines hacia el ESP32
+const SPINS = ['VCC', 'TRIG', 'ECHO', 'GND'];
+function sensor(id, name, sx, sz, desc) {
+  const g = new THREE.Group(); g.position.set(sx, 0, sz); scene.add(g);
+  box(2.4, 1, 4.8, MAT.foam, 0, 0.5, 0, g);
+  box(2.0, 0.16, 4.5, MAT.pcbBlue, 0, 1.1, 0, g);
+  for (const s of [-1, 1]) { cyl(0.8, 0.8, 1.2, MAT.silver, 0, 1.75, s * 1.3, g, 20); cyl(0.55, 0.55, 0.02, M('#5b5f62'), 0, 2.36, s * 1.3, g, 16); }
+  SPINS.forEach((n, i) => { const p = box(0.6, 0.06, 0.06, M('#d4b25a', { metalness: 0.6 }), 1.25, 1.15, -0.38 + i * 0.254, g, false); });
+  piece(id, name, V(sx, 5, sz), desc, g);
+  return n => V(sx + 1.55, 1.15, sz - 0.38 + SPINS.indexOf(n) * 0.254);
+}
+const s1 = sensor('s1', 'Sensor bebedero 1', -14, 7, 'HC-SR04 del bebedero 1. Para la prueba, acerquen y alejen la mano sobre los "ojos": el nivel cambia en la consola.');
+const s2 = sensor('s2', 'Sensor bebedero 2', -14, 15, 'HC-SR04 del bebedero 2. Mismo cableado que el sensor 1, a otros dos pines del ESP32.');
+
+// Bombas en vasos con agua; la manguera vuelve al mismo vaso (así no se riega nada)
+function pumpCup(id, name, cx, cz, desc) {
+  const g = new THREE.Group(); g.position.set(cx, 0, cz); scene.add(g);
+  const cup = mesh(new THREE.CylinderGeometry(3.4, 2.8, 9, 32, 1, true), new THREE.MeshStandardMaterial({ color: '#e8f2f4', transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false }), 0, 4.5, 0, g, false); cup.renderOrder = 3;
+  mesh(new THREE.CylinderGeometry(3.2, 2.8, 6.5, 32), new THREE.MeshStandardMaterial({ color: '#2f95d6', transparent: true, opacity: 0.55, depthWrite: false }), 0, 3.25, 0, g, false).renderOrder = 2;
+  const pump = new THREE.Group(); pump.position.set(-0.6, 0.1, 0); g.add(pump);
+  cyl(1.2, 1.2, 4.2, MAT.white, 0, 2.1, 0, pump, 24); cyl(1.22, 1.22, 1.8, MAT.silver, 0, 2.4, 0, pump, 24);
+  const nz = cyl(0.35, 0.35, 1.4, MAT.white, 1.6, 3.4, 0, pump, 10); nz.rotation.z = Math.PI / 2;
+  const hose = new THREE.CatmullRomCurve3([V(cx + 1.7, 3.4, cz), V(cx + 2.4, 7, cz), V(cx + 2.2, 10.5, cz), V(cx + 0.8, 11, cz), V(cx + 0.2, 8, cz)]);
+  mesh(new THREE.TubeGeometry(hose, 40, 0.38, 8, false), new THREE.MeshStandardMaterial({ color: '#d9eef6', transparent: true, opacity: 0.6, depthWrite: false }), 0, 0, 0, scene, false);
+  piece(id, name, V(cx, 13, cz), desc, g);
+  const top = V(cx - 0.9, 4.4, cz);
+  return { red: top.clone().add(V(0, 0, 0.12)), black: top.clone().add(V(0, 0, -0.12)), rim: V(cx - 2.6, 9.6, cz) };
+}
+const p1 = pumpCup('b1', 'Bomba bebedero 1', -9, -13, 'Mini bomba dentro de un vaso con agua. La manguera vuelve al mismo vaso para la prueba. Nunca la prendan fuera del agua.');
+const p2 = pumpCup('b2', 'Bomba bebedero 2', -17, -12, 'Igual que la bomba 1, conectada al canal K2 del relé.');
+
+/* ---------- cables ---------- */
+// cada cable: de (pieza, pin) a (pieza, pin), color, tipo y paso de armado
+const C = [];
+function cable(step, color, type, a, b, opts = {}) { C.push({ id: 'c' + C.length, step, color, type, a, b, ...opts }); }
+const CO = { r5: '#e5483d', r33: '#f08a2c', gnd: '#2a2a2a', trig: '#f2c230', echo: '#3fb36b', in1: '#3d8bfd', in2: '#9b59b6', usb: '#2f62c4' };
+cable(1, CO.usb, 'cable USB-A azul', { p: 'proto', pin: 'USB del MB102', pos: V(-8.3, 1.65, 1.6) }, { p: 'cargador', pin: 'salida USB-A', pos: V(-24, 3.2, -2.8) }, { thick: 0.28, lift: 1 });
+cable(2, CO.r5, 'hembra-macho', { p: 'rele', pin: 'VCC', pos: relHeader('VCC') }, { p: 'proto', pin: 'riel + 5 V (atrás)', pos: railPt('b5', 5.5) });
+cable(2, CO.gnd, 'hembra-macho', { p: 'rele', pin: 'GND', pos: relHeader('GND') }, { p: 'proto', pin: 'riel GND (atrás)', pos: railPt('bG', 3.6) });
+cable(3, CO.gnd, 'hembra-macho', { p: 'esp32', pin: 'GND', pos: espPin('GND') }, { p: 'proto', pin: 'riel GND (adelante)', pos: railPt('fG', 1.2) }, { note: 'El GND común: sin este cable el relé y los sensores no entienden las señales del ESP32.' });
+cable(4, CO.in1, 'hembra-hembra', { p: 'rele', pin: 'IN1', pos: relHeader('IN1') }, { p: 'esp32', pin: 'GPIO 25', pos: espPin('25') }, { note: 'Bomba del bebedero 1 (el que ya probaron).' });
+cable(4, CO.in2, 'hembra-hembra', { p: 'rele', pin: 'IN2', pos: relHeader('IN2') }, { p: 'esp32', pin: 'GPIO 26', pos: espPin('26') }, { note: 'Bomba del bebedero 2.' });
+for (const [s, n, fn, x0, trig, echo, echoName] of [['s1', 1, s1, -4.5, '19', 'VN (39)', 'GPIO 39 (VN)'], ['s2', 2, s2, -3.2, '18', 'VP (36)', 'GPIO 36 (VP)']]) {
+  cable(5, CO.r33, 'hembra-macho', { p: s, pin: 'VCC', pos: fn('VCC') }, { p: 'proto', pin: 'riel + 3.3 V (adelante)', pos: railPt('f33', x0) });
+  cable(5, CO.gnd, 'hembra-macho', { p: s, pin: 'GND', pos: fn('GND') }, { p: 'proto', pin: 'riel GND (adelante)', pos: railPt('fG', x0 + 0.5) });
+  cable(5, CO.trig, 'hembra-hembra', { p: s, pin: 'TRIG', pos: fn('TRIG') }, { p: 'esp32', pin: 'GPIO ' + trig, pos: espPin(trig) });
+  cable(5, CO.echo, 'hembra-hembra', { p: s, pin: 'ECHO', pos: fn('ECHO') }, { p: 'esp32', pin: echoName, pos: espPin(echo) });
+}
+cable(6, CO.r5, 'macho-macho', { p: 'proto', pin: 'riel + 5 V (atrás)', pos: railPt('b5', 1.5) }, { p: 'rele', pin: 'COM de K1', pos: relScrew(1, 'COM') }, { note: 'La punta macho se aprieta en el tornillo del medio de K1.' });
+cable(6, CO.r5, 'puente de alambre', { p: 'rele', pin: 'COM de K1', pos: relScrew(1, 'COM') }, { p: 'rele', pin: 'COM de K2', pos: relScrew(2, 'COM') }, { lift: 0.6, note: 'Un pedacito de alambre de COM de K1 a COM de K2: así los dos reciben 5 V con un solo cable desde la protoboard.' });
+cable(7, CO.r5, 'cable rojo de la bomba', { p: 'b1', pin: 'cable rojo', pos: p1.red, via: p1.rim }, { p: 'rele', pin: 'NO de K1', pos: relScrew(1, 'NO') }, { note: 'El hilo pelado va directo al tornillo. Si la bomba funciona al revés, pásenlo al otro tornillo del costado (NC).' });
+cable(7, CO.gnd, 'cable negro de la bomba + macho-macho', { p: 'b1', pin: 'cable negro', pos: p1.black, via: p1.rim }, { p: 'proto', pin: 'riel GND (atrás)', pos: railPt('bG', -2.6) }, { note: 'Enrollen el hilo pelado en la punta de un macho-macho, cúbranlo con cinta y métanlo al riel.' });
+cable(7, CO.r5, 'cable rojo de la bomba', { p: 'b2', pin: 'cable rojo', pos: p2.red, via: p2.rim }, { p: 'rele', pin: 'NO de K2', pos: relScrew(2, 'NO') }, { note: 'Directo al tornillo NO de K2.' });
+cable(7, CO.gnd, 'cable negro de la bomba + macho-macho', { p: 'b2', pin: 'cable negro', pos: p2.black, via: p2.rim }, { p: 'proto', pin: 'riel GND (atrás)', pos: railPt('bG', -1.6) });
+cable(8, CO.gnd, 'cable USB-C', { p: 'esp32', pin: 'USB-C', pos: V(ESP.x + 3, ESP.y + 0.2, ESP.z) }, { p: 'pc', pin: 'USB', pos: V(7, 0.9, 21) }, { thick: 0.22, lift: 1, note: 'Va al final: con todo conectado, enchufen el ESP32 a la computadora y corran el programa.' });
+
+const STEP_T = { 1: 'Alimentación del MB102', 2: 'Relé: VCC y GND', 3: 'GND del ESP32 (GND común)', 4: 'Señales al relé', 5: 'Sensores', 6: '5 V a los COM del relé', 7: 'Bombas', 8: 'ESP32 a la computadora' };
+
+for (const c of C) {
+  const a = c.a.pos, b = c.b.pos;
+  const d = a.distanceTo(b), lift = c.lift ?? (1.5 + d * 0.12);
+  let curve;
+  if (c.a.via) curve = new THREE.CatmullRomCurve3([a, a.clone().add(V(0, 2.5, 0)), c.a.via, c.a.via.clone().lerp(b, 0.5).add(V(0, 2, 0)), b]);
+  else curve = new THREE.CubicBezierCurve3(a, a.clone().add(V(0, lift, 0)), b.clone().add(V(0, lift, 0)), b);
+  c.mat = new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.5, transparent: true, opacity: 1, emissive: '#000' });
+  c.mesh = mesh(new THREE.TubeGeometry(curve, 60, c.thick || 0.12, 6, false), c.mat, 0, 0, 0, scene, false);
+  c.mesh.userData.cable = c.id;
+  clickables.push(c.mesh);
+  for (const end of [a, b]) mesh(new THREE.SphereGeometry((c.thick || 0.12) * 1.6, 8, 6), c.mat, end.x, end.y, end.z, scene, false).userData.cable = c.id;
+}
+
+/* ---------- etiquetas ---------- */
+const labelsEl = $('#labels'), _v = new THREE.Vector3();
+const tags = [];
+function addTag(anchor, html, cls, onClick) { const el = document.createElement('div'); el.className = 'tag ' + cls; el.innerHTML = html; labelsEl.appendChild(el); if (onClick) el.addEventListener('click', onClick); const t = { el, anchor }; tags.push(t); return t; }
+for (const id in PIECES) PIECES[id].tag = addTag(PIECES[id].anchor, `<b>${PIECES[id].name}</b>`, '', () => select(id));
+let pinTags = [];
+function setPinTags(list) {
+  pinTags.forEach(t => { t.el.remove(); tags.splice(tags.indexOf(t), 1); });
+  const placed = [];
+  pinTags = list.map(([pos, txt]) => {
+    const near = placed.filter(q => q.distanceTo(pos) < 2).length;
+    placed.push(pos);
+    return addTag(pos.clone().add(V(0, 0.9 + near * 1.3, 0)), txt, 'pin');
+  });
+}
+function placeTags() {
+  const w = window.innerWidth, h = window.innerHeight;
+  for (const t of tags) {
+    _v.copy(t.anchor).project(camera);
+    const vis = _v.z < 1 && Math.abs(_v.x) < 1.1 && Math.abs(_v.y) < 1.1;
+    t.el.style.display = vis ? '' : 'none';
+    if (vis) t.el.style.transform = `translate(${((_v.x + 1) / 2 * w).toFixed(1)}px,${((1 - _v.y) / 2 * h).toFixed(1)}px) translate(-50%,calc(-100% - 6px))`;
+  }
+}
+
+/* ---------- selección ---------- */
+let selPiece = null, selCable = null;
+const ORDER = ['proto', 'esp32', 'rele', 's1', 's2', 'b1', 'b2', 'cargador', 'pc'];
+$('#pieceBtns').innerHTML = ORDER.map(id => `<button data-p="${id}" aria-pressed="false">${PIECES[id].name}</button>`).join('');
+$('#pieceBtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b) select(b.dataset.p, true); });
+
+function cablesOf(id) { return C.filter(c => c.a.p === id || c.b.p === id); }
+function styleCables(active) {
+  for (const c of C) {
+    const on = !active || active.has(c.id);
+    c.mat.opacity = on ? 1 : 0.12; c.mat.depthWrite = on;
+    c.mat.emissive.set(active && on ? c.color : '#000'); c.mat.emissiveIntensity = active && on ? 0.35 : 0;
+  }
+}
+function connRow(c, from) {
+  const here = c.a.p === from ? c.a : c.b, there = c.a.p === from ? c.b : c.a;
+  return `<li><button class="crow${selCable === c.id ? ' sel' : ''}" data-c="${c.id}"><span class="sw" style="background:${c.color}"></span>
+    <span class="main"><span class="pin">${here.pin}</span><span class="to"><span class="arrow">→</span>${PIECES[there.p].name} · <b>${there.pin}</b></span>${c.note ? `<span class="nt">${c.note}</span>` : ''}</span>
+    <span class="type">${c.type}</span></button></li>`;
+}
+function select(id, fly, stay) {
+  selPiece = id; selCable = null;
+  document.querySelectorAll('#pieceBtns button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.p === id)));
+  for (const k in PIECES) { PIECES[k].tag.el.classList.toggle('sel', k === id); PIECES[k].tag.el.hidden = k === id; }
+  const list = cablesOf(id);
+  styleCables(new Set(list.map(c => c.id)));
+  const pins = [];
+  list.forEach(c => { pins.push([c.a.pos, c.a.p === id ? c.a.pin : c.a.pin]); pins.push([c.b.pos, c.b.pin]); });
+  setPinTags(dedupe(pins));
+  $('#pieceInfo').innerHTML = `<div class="card"><h3>${PIECES[id].name}</h3><p class="hint" style="color:var(--ink)">${PIECES[id].desc}</p></div>
+    <p class="hint">${list.length} cable${list.length === 1 ? '' : 's'}. Toca uno para verlo solo.</p><ul class="conn">${list.map(c => connRow(c, id)).join('')}</ul>`;
+  if (!stay) showView('pieza');
+  if (fly) focusOn(PIECES[id].anchor.clone().add(V(0, -3, 0)), 26);
+}
+function selectCable(cid, stay) {
+  const c = C.find(x => x.id === cid); if (!c) return;
+  if (!selPiece || (c.a.p !== selPiece && c.b.p !== selPiece)) select(c.a.p, false, stay);
+  selCable = cid;
+  styleCables(new Set([cid]));
+  setPinTags([[c.a.pos, `${PIECES[c.a.p].name.split(' ')[0]}: ${c.a.pin}`], [c.b.pos, `${PIECES[c.b.p].name.split(' ')[0]}: ${c.b.pin}`]]);
+  document.querySelectorAll('.crow').forEach(r => r.classList.toggle('sel', r.dataset.c === cid));
+}
+function dedupe(pins) { const seen = new Set(); return pins.filter(([p, t]) => { const k = p.toArray().map(n => n.toFixed(1)).join() + t; if (seen.has(k)) return false; seen.add(k); return true; }); }
+function clearSel() {
+  selPiece = selCable = null; styleCables(null); setPinTags([]);
+  document.querySelectorAll('#pieceBtns button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+  for (const k in PIECES) { PIECES[k].tag.el.classList.remove('sel'); PIECES[k].tag.el.hidden = false; }
+  $('#pieceInfo').innerHTML = `<div class="card"><h3>Resumen</h3><p class="hint" style="color:var(--ink)">Los rieles de la protoboard reparten la corriente: atrás <b>5 V</b> (relé y bombas), adelante <b>3.3 V</b> (sensores) y los dos azules <b>GND</b>. El ESP32 solo manda señales: 7 cables. Son ${C.length} conexiones en total.</p></div>
+    <p class="tip">Nunca prendan las 2 bombas juntas: el programa llena primero un bebedero y después el otro.</p>`;
+}
+$('#pieceInfo').addEventListener('click', e => { const r = e.target.closest('.crow'); if (r) selectCable(r.dataset.c); });
+
+/* ---------- lista para ir marcando ---------- */
+const KEY = 'conexion-prueba-checks';
+let done = new Set();
+try { done = new Set(JSON.parse(localStorage.getItem(KEY) || '[]')); } catch (e) {}
+function saveChecks() { try { localStorage.setItem(KEY, JSON.stringify([...done])); } catch (e) {} }
+function renderChecklist() {
+  let html = '';
+  for (const s of Object.keys(STEP_T)) {
+    html += `<div class="group-t">${s}. ${STEP_T[s]}</div><div class="card" style="padding:4px 12px">`;
+    for (const c of C.filter(x => x.step == s)) {
+      html += `<label class="check${done.has(c.id) ? ' done' : ''}"><input type="checkbox" data-c="${c.id}" ${done.has(c.id) ? 'checked' : ''}><span class="sw" style="background:${c.color}"></span><span class="t">${PIECES[c.a.p].name}: <b>${c.a.pin}</b> → ${PIECES[c.b.p].name}: <b>${c.b.pin}</b> <span class="hint">(${c.type})</span></span></label>`;
+    }
+    html += '</div>';
+  }
+  $('#checklist').innerHTML = html;
+  $('#progTxt').textContent = `${done.size} de ${C.length}`;
+  $('#progBar').style.width = (done.size / C.length * 100) + '%';
+}
+$('#checklist').addEventListener('change', e => { const id = e.target.dataset.c; if (!id) return; e.target.checked ? done.add(id) : done.delete(id); saveChecks(); renderChecklist(); selectCable(id, true); });
+$('#checklist').addEventListener('click', e => { if (e.target.closest('label') && !e.target.matches('input')) { const i = e.target.closest('label').querySelector('input'); selectCable(i.dataset.c, true); } });
+$('#resetChecks').addEventListener('click', () => { done.clear(); saveChecks(); renderChecklist(); });
+
+/* ---------- panel y vistas ---------- */
+let currentView = 'pieza';
+function showView(v) {
+  currentView = v;
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === v)));
+  document.querySelectorAll('.view').forEach(s => s.hidden = s.id !== 'view-' + v);
+  openPanel(true);
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showView(t.dataset.view)));
+function openPanel(open) {
+  $('#panel').classList.toggle('collapsed', !open);
+  const b = $('#collapseBtn'), t = open ? 'Minimizar panel' : 'Abrir panel'; b.setAttribute('aria-expanded', String(open)); b.setAttribute('aria-label', t); b.title = t;
+  if (typeof updateViewOffset === 'function') updateViewOffset();
+}
+$('#collapseBtn').addEventListener('click', () => openPanel($('#panel').classList.contains('collapsed')));
+function setClean(on) { document.body.classList.toggle('clean', on); const b = $('#hideBtn'); b.setAttribute('aria-pressed', String(on)); b.querySelector('.t').textContent = on ? 'Mostrar panel' : 'Ocultar panel'; updateViewOffset(); }
+$('#hideBtn').addEventListener('click', () => setClean(!document.body.classList.contains('clean')));
+window.addEventListener('keydown', e => { if (!e.target.closest('input') && (e.key === 'h' || e.key === 'H') && !e.ctrlKey && !e.metaKey) setClean(!document.body.classList.contains('clean')); });
+let fly = null;
+function flyTo(pos, target) { if (reduceMotion) { camera.position.copy(pos); controls.target.copy(target); return; } fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos.clone(), t1: target.clone(), k: 0 }; }
+function focusOn(target, dist) { const dir = camera.position.clone().sub(controls.target).normalize(); if (dir.y < 0.45) { dir.y = 0.45; dir.normalize(); } flyTo(target.clone().addScaledVector(dir, dist), target); }
+const mobile = () => window.innerWidth <= 760;
+$('#vHome').addEventListener('click', () => flyTo(mobile() ? V(10, 70, 70) : HOME.pos, HOME.target));
+$('#vTop').addEventListener('click', () => flyTo(V(-3, mobile() ? 85 : 62, 1.1), V(-3, 0, 1)));
+$('#showAll').addEventListener('click', clearSel);
+$('#lblBtn').addEventListener('click', () => { const on = !document.body.classList.toggle('nolabels'); $('#lblBtn').setAttribute('aria-pressed', String(on)); });
+
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+let downAt = null;
+canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+  const h = pick(e); if (!h) return;
+  if (h.cable) selectCable(h.cable); else if (h.piece) select(h.piece);
+});
+let hoverT = 0;
+canvas.addEventListener('pointermove', e => { if (e.buttons || performance.now() - hoverT < 80) return; hoverT = performance.now(); canvas.style.cursor = pick(e) ? 'pointer' : ''; });
+function pick(e) {
+  const r = canvas.getBoundingClientRect();
+  ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects(clickables, false).filter(h => !h.object.userData.cable || h.object.material.opacity > 0.5);
+  return hits[0] ? hits[0].object.userData : null;
+}
+function updateViewOffset() {
+  const w = window.innerWidth, h = window.innerHeight, pn = $('#panel');
+  const vis = !document.body.classList.contains('clean') && !pn.classList.contains('collapsed'), top = $('#topbar').offsetHeight;
+  let sx = 0, sy = -top / 2;
+  if (vis && w > 760) sx = (pn.offsetWidth + 12) / 2;
+  if (vis && w <= 760) sy = pn.offsetHeight / 2 - top / 2;
+  camera.setViewOffset(w, h, -sx, sy, w, h);
+}
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w <= 760 ? 50 : 40; camera.updateProjectionMatrix();
+  document.documentElement.style.setProperty('--topbar-h', $('#topbar').offsetHeight + 'px'); updateViewOffset();
+}
+window.addEventListener('resize', resize); resize();
+if (mobile()) { camera.position.set(10, 70, 70); openPanel(false); }
+
+clearSel(); renderChecklist();
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (fly) { fly.k = Math.min(1, fly.k + dt); const e = 1 - Math.pow(1 - fly.k, 3); camera.position.lerpVectors(fly.p0, fly.p1, e); controls.target.lerpVectors(fly.t0, fly.t1, e); if (fly.k >= 1) fly = null; }
+  controls.update(); renderer.render(scene, camera); placeTags();
+  requestAnimationFrame(frame);
+}
+window.__sceneReady = true; $('#loading').hidden = true;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

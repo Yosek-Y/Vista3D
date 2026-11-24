@@ -10,6 +10,10 @@ Abre `index.html` (simulación de la granja) o `maqueta.html` (maqueta física) 
 
 Paso a paso para conectar las piezas reales (ESP32, relé de 2 canales, MB102, mini bombas, HC-SR04), con los problemas de voltaje resueltos: los relés del módulo son de 24 V (`SRD-24VDC`), el ESP32 trabaja a 3.3 V y el MB102 no aguanta más de 2 bombas a la vez. Versión básica: pozo → tanque central → bebedero 1 y bebedero 2, con 3 bombas, 3 sensores (el pozo no lleva) y el módulo de 4 relés HW-316 de 5 V (se activa con LOW). El programa está en `firmware/monitor_hidrico/monitor_hidrico.ino`.
 
+## Conexión de prueba (`conexion-3d.html`)
+
+Vista 3D de la prueba en la mesa: protoboard con MB102, ESP32, relé HW-316, 2 sensores y 2 bombas en vasos. Al tocar una pieza se iluminan sus cables y aparece a dónde va cada uno. La pestaña "Lista para conectar" sirve para ir marcando los cables en orden. El programa de esta prueba está en `micropython/prueba_2_bebederos.py`.
+
 ## Maqueta (`maqueta.html`)
 
 La maqueta real de la versión básica a escala (1 unidad = 1 cm), hecha a partir de la foto de su base: plancha de hielo seco de ≈ 65 × 80 cm sobre 4 soportes y la lámina café, pozo (botella hundida), tanque central (galón cortado) y 2 bebederos (botellas acostadas, la manguera entra por la tapa) en corrales con cerca roja. Muestra dónde va el ESP32, el relé, el MB102, los sensores, las bombas, las mangueras y los cables por debajo.

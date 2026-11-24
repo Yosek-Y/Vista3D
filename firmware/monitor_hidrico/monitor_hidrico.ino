@@ -1,9 +1,12 @@
 /*
   Monitor Hídrico · Maqueta IoT con ESP32
   ---------------------------------------
-  FASE 1 (con las piezas que ya tienen):
-    - 3 sensores HC-SR04: pozo, tanque de reserva y bebedero de vacas
-    - 1 módulo de relé de 2 canales: B1 (pozo -> reserva) y B2 (reserva -> vacas)
+  MAQUETA BÁSICA (3 bombas):
+    - 3 sensores HC-SR04: tanque central, bebedero y tinaco de la casa (el pozo no lleva sensor)
+    - 1 módulo de 4 relés de 5 V (se usan 3 canales):
+        B1: pozo -> tanque central
+        B2: tanque central -> bebedero
+        B3: tanque central -> casa
 
   Qué hace:
     - Mide el nivel de cada depósito (%) con el ultrasonido.
@@ -15,7 +18,9 @@
     - Crea una página web en el ESP32: ábrela desde el celular con la IP que sale en el Monitor Serie.
       Si se cae el WiFi, el control sigue funcionando igual.
 
-  Para agregar más depósitos o bombas (fase 2), agrega filas en dep[] y bom[].
+  El pozo no tiene sensor: si se queda sin agua, el tanque no sube mientras B1 trabaja,
+  la detección de fugas lo nota a los VENTANA_FUGA_MS y apaga B1 (así no trabaja en seco mucho tiempo).
+  Para agregar más depósitos o bombas, agrega filas en dep[] y bom[].
   Placa en Arduino IDE: "ESP32 Dev Module". Monitor Serie a 115200.
 */
 
@@ -26,7 +31,7 @@
 const char* WIFI_SSID = "NOMBRE_DE_TU_WIFI";
 const char* WIFI_PASS = "CLAVE_DE_TU_WIFI";
 
-// Jumper del módulo de relé en "High": el relé se activa con HIGH.
+// Jumper del módulo de relé en "High": el relé se activa con HIGH (recomendado).
 // Si lo pones en "Low", cambia estas dos líneas (ON = LOW, OFF = HIGH).
 #define RELE_ON  HIGH
 #define RELE_OFF LOW
@@ -53,13 +58,9 @@ struct Deposito {
 
 Deposito dep[] = {
   // nombre               TRIG ECHO  vacío lleno
-  {"Pozo",                 4,  34,  20.0,  5.5, 0, 0, false},
-  {"Tanque de reserva",    5,  35,  25.0,  5.0, 0, 0, false},
-  {"Bebedero de vacas",   19,  39,   9.0,  4.5, 0, 0, false},
-  // Fase 2:
-  // {"Tinaco de la casa",  18,  36,  14.0,  4.5, 0, 0, false},
-  // {"Bebedero caballos",  21,  16,   9.0,  4.5, 0, 0, false},
-  // {"Bebedero cerdos",    22,  17,   9.0,  4.5, 0, 0, false},
+  {"Tanque central",       5,  35,  25.0,  5.0, 0, 0, false},   // índice 0
+  {"Bebedero",            19,  39,   9.0,  4.5, 0, 0, false},   // índice 1
+  {"Tinaco de la casa",   18,  36,  14.0,  4.5, 0, 0, false},   // índice 2
 };
 const int N_DEP = sizeof(dep) / sizeof(dep[0]);
 
@@ -76,13 +77,9 @@ struct Bomba {
 
 Bomba bom[] = {
   // nombre          GPIO origen destino
-  {"B1 (pozo -> reserva)",  25, 0, 1, false, false, false, 0, 0, 0},
-  {"B2 (reserva -> vacas)", 26, 1, 2, false, false, false, 0, 0, 0},
-  // Fase 2 (con un módulo de más canales):
-  // {"V0 (red -> pozo)",       23, -1, 0, false, false, false, 0, 0, 0},
-  // {"B3 (reserva -> caballos)",27, 1, 4, false, false, false, 0, 0, 0},
-  // {"B4 (reserva -> cerdos)", 32, 1, 5, false, false, false, 0, 0, 0},
-  // {"B5 (reserva -> casa)",   33, 1, 3, false, false, false, 0, 0, 0},
+  {"B1 (pozo -> tanque)",     25, -1, 0, false, false, false, 0, 0, 0},  // relé IN1 (el pozo no tiene sensor)
+  {"B2 (tanque -> bebedero)", 26,  0, 1, false, false, false, 0, 0, 0},  // relé IN2
+  {"B3 (tanque -> casa)",     27,  0, 2, false, false, false, 0, 0, 0},  // relé IN3
 };
 const int N_BOM = sizeof(bom) / sizeof(bom[0]);
 
@@ -215,11 +212,14 @@ void controlar() {
           apagar(i, "posible fuga");
           b.bloqueada = true;
           alerta(String("CUIDADO: ") + b.nombre + " estuvo " + String(VENTANA_FUGA_MS / 1000) +
-                 " s encendida y " + d.nombre + " no subió. Puede haber una manguera rota o suelta.");
+                 " s encendida y " + d.nombre + " no subió. " +
+                 (b.origen < 0 ? "El pozo puede estar vacío o la manguera rota o suelta."
+                               : "Puede haber una manguera rota o suelta."));
           // si se bloquean varias bombas del mismo origen, el problema es el tramo común
           int mismas = 0;
+          if (b.origen < 0) continue;
           for (int k = 0; k < N_BOM; k++) if (bom[k].bloqueada && bom[k].origen == b.origen) mismas++;
-          if (mismas >= 2) alerta("Varias bombas del mismo depósito no logran subir el nivel: revisa la manguera principal.");
+          if (mismas >= 2) alerta("B2 y B3 fallaron: revisa que sus bombas sigan sumergidas en el tanque central y que las mangueras no estén sueltas.");
         } else {
           b.tVentana = ahora;
           b.nivelVentana = d.nivel;

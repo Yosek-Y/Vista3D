@@ -138,4 +138,5 @@ try:
 finally:
     for b in bebederos:
         b.rele.value(1)   # al detener el programa, todas las bombas quedan apagadas
+    bomba2.value(1)
     print("Programa detenido. Bombas apagadas.")

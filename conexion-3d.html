@@ -118,13 +118,13 @@ body.nolabels #labels .tag:not(.pin){display:none}
 </script>
 </head>
 <body>
-<canvas id="scene" tabindex="0" aria-label="Mesa de prueba en 3D: protoboard con MB102, ESP32, relé de 4 canales, 2 sensores HC-SR04 y 2 bombas en vasos con agua, con todos sus cables"></canvas>
+<canvas id="scene" tabindex="0" aria-label="Mesa de prueba en 3D: protoboard con MB102, ESP32, relé de 4 canales, 1 sensor HC-SR04 y 2 bombas en vasos con agua, con todos sus cables"></canvas>
 <div id="labels"></div>
 
 <header id="topbar">
   <div class="brand">
     <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="12" width="24" height="9" rx="1.5" fill="#e9ecef"/><path d="M8 12c0-6 6-8 8-3M24 21c0 6-6 7-9 3" fill="none" stroke="#4ab6e6" stroke-width="2.2" stroke-linecap="round"/><path d="M6 14h20M6 19h20" stroke="#e5483d" stroke-width="1"/></svg>
-    <div><h1>Conexión de prueba</h1><small>2 sensores · 2 bombas · un solo GND común</small></div>
+    <div><h1>Conexión de prueba</h1><small>1 sensor · 2 bombas · un solo GND común</small></div>
   </div>
   <div class="tb-group">
     <button class="btn" id="vHome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span class="t">General</span></button>
@@ -258,7 +258,7 @@ function espPin(name) {
   box(0.75, 0.3, 0.9, MAT.silver, 2.65, ESP.y + 0.2, 0, g);
   for (const s of [-1, 1]) { box(4.85, 0.3, 0.25, MAT.black, 0, ESP.y + 0.2, s * 1.25, g); for (let i = 0; i < 19; i++) box(0.06, 0.22, 0.06, M('#d4b25a', { metalness: 0.6 }), -2.29 + i * 0.254, ESP.y + 0.45, s * 1.25, g, false); }
   mesh(new THREE.SphereGeometry(0.1, 8, 8), M('#3aa6ff', { emissive: '#3aa6ff', emissiveIntensity: 1.2 }), 1.6, ESP.y + 0.12, 0.8, g, false);
-  piece('esp32', 'ESP32', V(ESP.x, 5, ESP.z), 'Fuera de la protoboard (es muy ancho), sobre un taquito de hielo seco. Solo manda señales: 7 cables. El orden de los pines puede variar según la placa: <b>guíense por el número impreso</b> junto a cada pin.', g);
+  piece('esp32', 'ESP32', V(ESP.x, 5, ESP.z), 'Fuera de la protoboard (es muy ancho), sobre un taquito de hielo seco. Solo manda señales: 5 cables. El orden de los pines puede variar según la placa: <b>guíense por el número impreso</b> junto a cada pin.', g);
 }
 
 // Relé HW-316: pines hacia la protoboard, bornes hacia atrás
@@ -294,8 +294,7 @@ function sensor(id, name, sx, sz, desc) {
   piece(id, name, V(sx, 5, sz), desc, g);
   return n => V(sx + 1.55, 1.15, sz - 0.38 + SPINS.indexOf(n) * 0.254);
 }
-const s1 = sensor('s1', 'Sensor bebedero 1', -14, 7, 'HC-SR04 del bebedero 1. Para la prueba, acerquen y alejen la mano sobre los "ojos": el nivel cambia en la consola.');
-const s2 = sensor('s2', 'Sensor bebedero 2', -14, 15, 'HC-SR04 del bebedero 2. Mismo cableado que el sensor 1, a otros dos pines del ESP32.');
+const s1 = sensor('s1', 'Sensor bebedero 1', -14, 10, 'HC-SR04 del bebedero 1. TRIG al GPIO 19 y ECHO al GPIO 34. Para la prueba, acerquen y alejen la mano sobre los "ojos": el nivel cambia en la consola.');
 
 // Bombas en vasos con agua; la manguera vuelve al mismo vaso (así no se riega nada)
 function pumpCup(id, name, cx, cz, desc) {
@@ -325,7 +324,7 @@ cable(2, CO.gnd, 'hembra-macho', { p: 'rele', pin: 'GND', pos: relHeader('GND') 
 cable(3, CO.gnd, 'hembra-macho', { p: 'esp32', pin: 'GND', pos: espPin('GND') }, { p: 'proto', pin: 'riel GND (adelante)', pos: railPt('fG', 1.2) }, { note: 'El GND común: sin este cable el relé y los sensores no entienden las señales del ESP32.' });
 cable(4, CO.in1, 'hembra-hembra', { p: 'rele', pin: 'IN1', pos: relHeader('IN1') }, { p: 'esp32', pin: 'GPIO 25', pos: espPin('25') }, { note: 'Bomba del bebedero 1 (el que ya probaron).' });
 cable(4, CO.in2, 'hembra-hembra', { p: 'rele', pin: 'IN2', pos: relHeader('IN2') }, { p: 'esp32', pin: 'GPIO 26', pos: espPin('26') }, { note: 'Bomba del bebedero 2.' });
-for (const [s, n, fn, x0, trig, echo, echoName] of [['s1', 1, s1, -4.5, '19', 'VN (39)', 'GPIO 39 (VN)'], ['s2', 2, s2, -3.2, '18', 'VP (36)', 'GPIO 36 (VP)']]) {
+for (const [s, n, fn, x0, trig, echo, echoName] of [['s1', 1, s1, -4.5, '19', '34', 'GPIO 34']]) {
   cable(5, CO.r33, 'hembra-macho', { p: s, pin: 'VCC', pos: fn('VCC') }, { p: 'proto', pin: 'riel + 3.3 V (adelante)', pos: railPt('f33', x0) });
   cable(5, CO.gnd, 'hembra-macho', { p: s, pin: 'GND', pos: fn('GND') }, { p: 'proto', pin: 'riel GND (adelante)', pos: railPt('fG', x0 + 0.5) });
   cable(5, CO.trig, 'hembra-hembra', { p: s, pin: 'TRIG', pos: fn('TRIG') }, { p: 'esp32', pin: 'GPIO ' + trig, pos: espPin(trig) });
@@ -339,7 +338,7 @@ cable(7, CO.r5, 'cable rojo de la bomba', { p: 'b2', pin: 'cable rojo', pos: p2.
 cable(7, CO.gnd, 'cable negro de la bomba + macho-macho', { p: 'b2', pin: 'cable negro', pos: p2.black, via: p2.rim }, { p: 'proto', pin: 'riel GND (atrás)', pos: railPt('bG', -1.6) });
 cable(8, CO.gnd, 'cable USB-C', { p: 'esp32', pin: 'USB-C', pos: V(ESP.x + 3, ESP.y + 0.2, ESP.z) }, { p: 'pc', pin: 'USB', pos: V(7, 0.9, 21) }, { thick: 0.22, lift: 1, note: 'Va al final: con todo conectado, enchufen el ESP32 a la computadora y corran el programa.' });
 
-const STEP_T = { 1: 'Alimentación del MB102', 2: 'Relé: VCC y GND', 3: 'GND del ESP32 (GND común)', 4: 'Señales al relé', 5: 'Sensores', 6: '5 V a los COM del relé', 7: 'Bombas', 8: 'ESP32 a la computadora' };
+const STEP_T = { 1: 'Alimentación del MB102', 2: 'Relé: VCC y GND', 3: 'GND del ESP32 (GND común)', 4: 'Señales al relé', 5: 'Sensor', 6: '5 V a los COM del relé', 7: 'Bombas', 8: 'ESP32 a la computadora' };
 
 for (const c of C) {
   const a = c.a.pos, b = c.b.pos;
@@ -381,7 +380,7 @@ function placeTags() {
 
 /* ---------- selección ---------- */
 let selPiece = null, selCable = null;
-const ORDER = ['proto', 'esp32', 'rele', 's1', 's2', 'b1', 'b2', 'cargador', 'pc'];
+const ORDER = ['proto', 'esp32', 'rele', 's1', 'b1', 'b2', 'cargador', 'pc'];
 $('#pieceBtns').innerHTML = ORDER.map(id => `<button data-p="${id}" aria-pressed="false">${PIECES[id].name}</button>`).join('');
 $('#pieceBtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b) select(b.dataset.p, true); });
 
@@ -426,13 +425,13 @@ function clearSel() {
   selPiece = selCable = null; styleCables(null); setPinTags([]);
   document.querySelectorAll('#pieceBtns button').forEach(b => b.setAttribute('aria-pressed', 'false'));
   for (const k in PIECES) { PIECES[k].tag.el.classList.remove('sel'); PIECES[k].tag.el.hidden = false; }
-  $('#pieceInfo').innerHTML = `<div class="card"><h3>Resumen</h3><p class="hint" style="color:var(--ink)">Los rieles de la protoboard reparten la corriente: atrás <b>5 V</b> (relé y bombas), adelante <b>3.3 V</b> (sensores) y los dos azules <b>GND</b>. El ESP32 solo manda señales: 7 cables. Son ${C.length} conexiones en total.</p></div>
+  $('#pieceInfo').innerHTML = `<div class="card"><h3>Resumen</h3><p class="hint" style="color:var(--ink)">Los rieles de la protoboard reparten la corriente: atrás <b>5 V</b> (relé y bombas), adelante <b>3.3 V</b> (sensores) y los dos azules <b>GND</b>. El ESP32 solo manda señales: 5 cables. Son ${C.length} conexiones en total.</p></div>
     <p class="tip">Nunca prendan las 2 bombas juntas: el programa llena primero un bebedero y después el otro.</p>`;
 }
 $('#pieceInfo').addEventListener('click', e => { const r = e.target.closest('.crow'); if (r) selectCable(r.dataset.c); });
 
 /* ---------- lista para ir marcando ---------- */
-const KEY = 'conexion-prueba-checks';
+const KEY = 'conexion-prueba-checks-1sensor';
 let done = new Set();
 try { done = new Set(JSON.parse(localStorage.getItem(KEY) || '[]')); } catch (e) {}
 function saveChecks() { try { localStorage.setItem(KEY, JSON.stringify([...done])); } catch (e) {} }

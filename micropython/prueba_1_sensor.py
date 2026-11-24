@@ -1,14 +1,15 @@
-# Prueba con 2 bebederos: 2 sensores HC-SR04 + 2 bombas (relé HW-316) · MicroPython para ESP32
+# Prueba con 1 sensor HC-SR04 + 2 bombas (relé HW-316) · MicroPython para ESP32
 #
 # Conexiones:
-#   Bebedero 1: sensor TRIG -> GPIO 19, ECHO -> GPIO 39 (VN) · bomba en K1 (IN1 -> GPIO 25)
-#   Bebedero 2: sensor TRIG -> GPIO 18, ECHO -> GPIO 36 (VP) · bomba en K2 (IN2 -> GPIO 26)
-#   VCC de los sensores -> riel 3.3 V · VCC del relé y COM de K1/K2 -> riel 5 V · todos los GND -> riel GND
+#   Bebedero 1: sensor TRIG -> GPIO 19, ECHO -> GPIO 34 · bomba en K1 (IN1 -> GPIO 25)
+#   Bomba 2:    en K2 (IN2 -> GPIO 26). Sin sensor por ahora: queda apagada.
+#   VCC del sensor -> riel 3.3 V · VCC del relé y COM de K1/K2 -> riel 5 V · todos los GND -> riel GND
 #
 # Qué hace:
 #   - Mide el nivel de cada bebedero (%) cada medio segundo y lo muestra en la consola.
 #   - Si un bebedero baja de ENCENDER %, prende su bomba; al llegar a APAGAR % la apaga.
-#   - NUNCA prende las 2 bombas juntas: si los 2 necesitan agua, llena primero el más bajo y después el otro.
+#   - NUNCA prende 2 bombas juntas: si hay 2 bebederos con sensor y ambos necesitan agua,
+#     llena primero el más bajo y después el otro (cuando agreguen el segundo sensor).
 #   - Si una bomba lleva VENTANA_S segundos prendida y el nivel no sube, la apaga y la bloquea
 #     (tanque vacío o manguera suelta). Para desbloquear, presionen el botón EN del ESP32.
 
@@ -75,9 +76,12 @@ class Bebedero:
 
 # cm_vacio y cm_lleno: mídanlos con la consola (vacío y lleno) y cámbienlos aquí
 bebederos = [
-    Bebedero("Bebedero 1", trig=19, echo=39, rele=25, cm_vacio=13.0, cm_lleno=5.0),
-    Bebedero("Bebedero 2", trig=18, echo=36, rele=26, cm_vacio=13.0, cm_lleno=5.0),
+    Bebedero("Bebedero 1", trig=19, echo=34, rele=25, cm_vacio=13.0, cm_lleno=5.0),
+    # Cuando tengan el segundo sensor, quiten el # de la línea de abajo y conéctenlo a TRIG 18 / ECHO 35:
+    # Bebedero("Bebedero 2", trig=18, echo=35, rele=26, cm_vacio=13.0, cm_lleno=5.0),
 ]
+
+bomba2 = Pin(26, Pin.OUT, value=1)   # bomba 2 sin sensor: apagada durante esta prueba
 
 
 def controlar():
